@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import {
   BookOpen, BarChart2, History, Menu, X, LogOut, User,
-  Cloud, RefreshCw, AlertCircle, WifiOff, Sun, Moon
+  Sun, Moon
 } from 'lucide-react';
 import { NavPage } from '../types';
 import { useAuth } from '../AuthContext';
-import { useApp } from '../AppContext';
 import { useTheme } from '../ThemeContext';
 
 interface SidebarProps {
@@ -22,7 +21,6 @@ const navItems: { id: NavPage; label: string; icon: React.ReactNode }[] = [
 export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, signOut } = useAuth();
-  const { syncStatus, refreshSessions } = useApp();
   const { isDark, toggleTheme } = useTheme();
 
   const ThemeToggle = ({ compact = false }: { compact?: boolean }) => (
@@ -51,44 +49,6 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
       )}
     </button>
   );
-
-  const SyncBadge = () => {
-    if (!user) return null;
-    return (
-      <div
-        className="px-3 py-1.5 mx-3 mb-2 rounded-xl text-[11px] font-medium flex items-center justify-between border"
-        style={
-          syncStatus === 'synced'
-            ? { background: isDark ? '#064E3B' : '#F0FDF4', borderColor: isDark ? '#047857' : '#BBF7D0', color: isDark ? '#6EE7B7' : '#16A34A' }
-            : syncStatus === 'syncing'
-              ? { background: isDark ? '#1E3A8A' : '#EFF6FF', borderColor: isDark ? '#1D4ED8' : '#BFDBFE', color: isDark ? '#93C5FD' : '#2563EB' }
-              : syncStatus === 'offline'
-                ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }
-                : { background: isDark ? '#7F1D1D' : '#FEF2F2', borderColor: isDark ? '#B91C1C' : '#FECACA', color: isDark ? '#FCA5A5' : '#DC2626' }
-        }
-      >
-        <span className="flex items-center gap-1.5 truncate">
-          {syncStatus === 'synced' && <Cloud size={13} className="shrink-0" />}
-          {syncStatus === 'syncing' && <RefreshCw size={13} className="shrink-0 animate-spin" />}
-          {syncStatus === 'offline' && <WifiOff size={13} className="shrink-0" />}
-          {syncStatus === 'error' && <AlertCircle size={13} className="shrink-0" />}
-          <span>
-            {syncStatus === 'synced' && 'Realtime Synced'}
-            {syncStatus === 'syncing' && 'Syncing...'}
-            {syncStatus === 'offline' && 'Offline'}
-            {syncStatus === 'error' && 'Sync error'}
-          </span>
-        </span>
-        <button
-          onClick={() => refreshSessions()}
-          title="Force refresh from cloud"
-          className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10"
-        >
-          <RefreshCw size={11} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
-        </button>
-      </div>
-    );
-  };
 
   const NavLinks = () => (
     <nav className="flex-1 py-3 px-3">
@@ -187,7 +147,6 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
       >
         <Logo />
         <NavLinks />
-        <SyncBadge />
         <UserFooter />
       </aside>
 
@@ -206,15 +165,6 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
           {/* Mobile Theme Toggle Button */}
           <ThemeToggle compact />
 
-          {user && (
-            <span
-              className="w-2.5 h-2.5 rounded-full inline-block"
-              style={{
-                background: syncStatus === 'synced' ? '#16A34A' : syncStatus === 'syncing' ? '#2563EB' : '#DC2626',
-              }}
-              title={`Status: ${syncStatus}`}
-            />
-          )}
           <button
             onClick={() => setMobileOpen(v => !v)}
             className="p-2 rounded-xl border"
@@ -235,7 +185,6 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
           >
             <Logo />
             <NavLinks />
-            <SyncBadge />
             <UserFooter />
           </div>
         </div>

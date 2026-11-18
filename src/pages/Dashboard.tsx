@@ -4,7 +4,6 @@ import SummaryCards from '../components/SummaryCards';
 import SubjectSummaryTable from '../components/SubjectSummaryTable';
 import { WeeklyChart } from '../components/Charts';
 import DataControls from '../components/DataControls';
-import ImportLocalDataBanner from '../components/ImportLocalDataBanner';
 import { useApp } from '../AppContext';
 import { Loader2, AlertCircle } from 'lucide-react';
 
@@ -22,7 +21,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
-      <ImportLocalDataBanner />
       {error && (
         <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm border"
           style={{ background: '#FEF2F2', borderColor: '#FECACA', color: '#DC2626' }}>

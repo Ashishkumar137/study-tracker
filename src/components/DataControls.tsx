@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Download, Trash2, AlertTriangle } from 'lucide-react';
 import { useApp } from '../AppContext';
 import { useAuth } from '../AuthContext';
 import { exportAsCSV, exportAsJSON } from '../storage';
@@ -35,18 +35,11 @@ function ClearConfirmDialog({ onConfirm, onCancel }: { onConfirm: () => void; on
 }
 
 export default function DataControls() {
-  const { sessions, clearAllSessions, refreshSessions } = useApp();
+  const { sessions, clearAllSessions } = useApp();
   const { user } = useAuth();
   const [showConfirm, setShowConfirm] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   const completed = sessions.filter(s => s.status === 'completed');
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await refreshSessions();
-    setRefreshing(false);
-  };
 
   return (
     <>
@@ -75,17 +68,6 @@ export default function DataControls() {
             <Download size={14} />
             Export JSON
           </button>
-          {user && (
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all"
-              style={{ background: 'var(--badge-bg)', borderColor: 'var(--badge-border)', color: 'var(--badge-text)' }}
-            >
-              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-              {refreshing ? 'Syncing…' : 'Sync from Cloud'}
-            </button>
-          )}
           <button
             onClick={() => setShowConfirm(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ml-auto"
@@ -97,7 +79,7 @@ export default function DataControls() {
         </div>
         <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
           {completed.length} completed session{completed.length !== 1 ? 's' : ''} ·{' '}
-          {user ? '☁ Saved to Supabase cloud' : '💾 Saved to localStorage (log in for cloud sync)'}
+          {user ? '☁ Automatically saved to Supabase cloud' : '💾 Saved to localStorage (log in for cloud sync)'}
         </p>
       </div>
     </>
