@@ -43,7 +43,7 @@ function AppShell() {
               {page === 'history' && 'Attendance History'}
             </h1>
             <p className="text-xs sm:text-sm mt-0.5" style={{ color: '#64748B' }}>
-              {page === 'dashboard' && 'Track your daily SSC CGL study sessions in real time'}
+              {page === 'dashboard' && 'Track your daily study sessions in real time'}
               {page === 'analytics' && 'Visualise your subject consistency and progress'}
               {page === 'history' && 'Review and manage your cloud-synced study history'}
             </p>
