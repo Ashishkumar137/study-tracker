@@ -75,7 +75,7 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
             }
           }}
         >
-          <span style={{ color: currentPage === item.id ? '#2563EB' : 'var(--text-muted)' }}>{item.icon}</span>
+          <span style={{ color: currentPage === item.id ? (isDark ? '#60A5FA' : '#2563EB') : 'var(--text-muted)' }}>{item.icon}</span>
           <span>{item.label}</span>
         </button>
       ))}

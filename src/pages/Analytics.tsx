@@ -3,11 +3,13 @@ import { WeeklyChart, MonthlyChart } from '../components/Charts';
 import SubjectDonutChart from '../components/SubjectDonutChart';
 import SubjectSummaryTable from '../components/SubjectSummaryTable';
 import { useApp } from '../AppContext';
+import { useTheme } from '../ThemeContext';
 import { getWeekStart, dateStr, msToHours, todayStr, calcDayProductiveMs } from '../storage';
 import { DAILY_TARGET_HOURS } from '../types';
 
 function WeeklyConsistency() {
   const { sessions, activeSession } = useApp();
+  const { isDark } = useTheme();
   const now = new Date();
   const today = todayStr();
   const weekStart = getWeekStart(now);
@@ -39,9 +41,9 @@ function WeeklyConsistency() {
                   isFuture
                     ? { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' }
                     : reached
-                      ? { background: '#DCFCE7', borderColor: '#BBF7D0', color: '#16A34A' }
+                      ? { background: isDark ? '#064E3B' : '#DCFCE7', borderColor: isDark ? '#047857' : '#BBF7D0', color: isDark ? '#6EE7B7' : '#16A34A' }
                       : h > 0
-                        ? { background: '#DBEAFE', borderColor: '#BFDBFE', color: '#2563EB' }
+                        ? { background: isDark ? '#1C1C24' : '#DBEAFE', borderColor: isDark ? '#33333F' : '#BFDBFE', color: isDark ? '#60A5FA' : '#2563EB' }
                         : { background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' }
                 }
               >
@@ -56,10 +58,10 @@ function WeeklyConsistency() {
       </div>
       <div className="flex gap-4 mt-4 text-xs" style={{ color: 'var(--text-secondary)' }}>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded" style={{ background: '#DCFCE7', border: '1px solid #BBF7D0' }} /> Target reached (10h+)
+          <span className="w-3 h-3 rounded" style={{ background: isDark ? '#064E3B' : '#DCFCE7', border: `1px solid ${isDark ? '#047857' : '#BBF7D0'}` }} /> Target reached (10h+)
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded" style={{ background: '#DBEAFE', border: '1px solid #BFDBFE' }} /> Partial study
+          <span className="w-3 h-3 rounded" style={{ background: isDark ? '#1C1C24' : '#DBEAFE', border: `1px solid ${isDark ? '#33333F' : '#BFDBFE'}` }} /> Partial study
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-color)' }} /> No study

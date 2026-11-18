@@ -1,6 +1,7 @@
 import React from 'react';
 import { SUBJECTS } from '../types';
 import { useApp } from '../AppContext';
+import { useTheme } from '../ThemeContext';
 import {
   formatHours, msToHours, todayStr, getWeekStart, dateStr,
   calcSubjectDayProductiveMs, calcSubjectRangeProductiveMs
@@ -8,6 +9,7 @@ import {
 
 export default function SubjectSummaryTable() {
   const { sessions, activeSession } = useApp();
+  const { isDark } = useTheme();
   const today = todayStr();
   const now = new Date();
   const weekStart = getWeekStart(now);
@@ -92,7 +94,7 @@ export default function SubjectSummaryTable() {
                   </td>
                   <td
                     className="text-right px-4 py-3 tabular-nums font-medium"
-                    style={{ color: todayH > 0 ? '#2563EB' : 'var(--text-secondary)' }}
+                    style={{ color: todayH > 0 ? (isDark ? '#60A5FA' : '#2563EB') : 'var(--text-secondary)' }}
                   >
                     {formatHours(todayH)}
                   </td>

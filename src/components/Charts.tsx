@@ -107,9 +107,9 @@ export function WeeklyChart() {
 
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} barSize={28} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#F1F5F9'} vertical={false} />
-          <XAxis dataKey="day" tick={{ fontSize: 12, fill: isDark ? '#94A3B8' : '#64748B' }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: isDark ? '#94A3B8' : '#64748B' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#27272E' : '#F1F5F9'} vertical={false} />
+          <XAxis dataKey="day" tick={{ fontSize: 12, fill: isDark ? '#A0A0AB' : '#64748B' }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: isDark ? '#A0A0AB' : '#64748B' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
           <Tooltip content={<CustomTooltip />} />
           <ReferenceLine y={DAILY_TARGET_HOURS} stroke="#EF4444" strokeDasharray="4 2" strokeWidth={1.5} />
           <Bar dataKey="hours" radius={[6, 6, 0, 0]}>
@@ -222,9 +222,9 @@ export function MonthlyChart() {
 
       <ResponsiveContainer width="100%" height={200}>
         <BarChart data={data} barSize={Math.max(4, Math.floor(560 / days) - 2)} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#F1F5F9'} vertical={false} />
-          <XAxis dataKey="day" tick={{ fontSize: 10, fill: isDark ? '#94A3B8' : '#64748B' }} axisLine={false} tickLine={false} interval={3} />
-          <YAxis tick={{ fontSize: 11, fill: isDark ? '#94A3B8' : '#64748B' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#27272E' : '#F1F5F9'} vertical={false} />
+          <XAxis dataKey="day" tick={{ fontSize: 10, fill: isDark ? '#A0A0AB' : '#64748B' }} axisLine={false} tickLine={false} interval={3} />
+          <YAxis tick={{ fontSize: 11, fill: isDark ? '#A0A0AB' : '#64748B' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
           <Tooltip content={<CustomTooltip />} />
           <ReferenceLine y={DAILY_TARGET_HOURS} stroke="#EF4444" strokeDasharray="4 2" strokeWidth={1.5} />
           <Bar dataKey="hours" radius={[3, 3, 0, 0]}>

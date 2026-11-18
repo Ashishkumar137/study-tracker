@@ -15,17 +15,17 @@
 }
 
 html.dark {
-  --bg-app: #0F172A;
-  --bg-card: #1E293B;
-  --bg-subtle: #0B0F19;
-  --border-color: #334155;
-  --text-main: #F8FAFC;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
-  --input-bg: #0F172A;
-  --badge-bg: #1E3A8A;
-  --badge-text: #93C5FD;
-  --badge-border: #1E40AF;
+  --bg-app: #09090B;
+  --bg-card: #141416;
+  --bg-subtle: #1C1C20;
+  --border-color: #27272E;
+  --text-main: #F4F4F6;
+  --text-secondary: #A0A0AB;
+  --text-muted: #666672;
+  --input-bg: #141416;
+  --badge-bg: #22222A;
+  --badge-text: #F4F4F6;
+  --badge-border: #33333F;
 }
 
 @layer base {

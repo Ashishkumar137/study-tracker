@@ -26,21 +26,21 @@ function StatCard({
       }}
     >
       <div
-        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border"
+        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border transition-all"
         style={{
           background: achieved
             ? (isDark ? '#064E3B' : '#DCFCE7')
             : accent
-              ? (isDark ? '#1E3A8A' : '#DBEAFE')
+              ? (isDark ? '#1C1C24' : '#DBEAFE')
               : 'var(--bg-subtle)',
           borderColor: achieved
             ? (isDark ? '#047857' : '#BBF7D0')
             : accent
-              ? (isDark ? '#1D4ED8' : '#BFDBFE')
+              ? (isDark ? '#33333F' : '#BFDBFE')
               : 'var(--border-color)',
         }}
       >
-        <span style={{ color: achieved ? '#16A34A' : accent ? '#2563EB' : 'var(--text-secondary)' }}>
+        <span style={{ color: achieved ? (isDark ? '#4ADE80' : '#16A34A') : accent ? (isDark ? '#60A5FA' : '#2563EB') : 'var(--text-secondary)' }}>
           {icon}
         </span>
       </div>
@@ -49,7 +49,7 @@ function StatCard({
         <p
           className="text-2xl font-bold mt-0.5 tabular-nums"
           style={{
-            color: achieved ? '#16A34A' : accent ? '#2563EB' : 'var(--text-main)',
+            color: achieved ? (isDark ? '#4ADE80' : '#16A34A') : accent ? (isDark ? '#60A5FA' : '#2563EB') : 'var(--text-main)',
           }}
         >
           {value}

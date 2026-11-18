@@ -125,7 +125,7 @@ export default function AttendanceCard() {
           </div>
           <div className="text-right">
             <div className="flex items-center gap-2 justify-end">
-              <Clock size={16} style={{ color: '#2563EB' }} />
+              <Clock size={16} style={{ color: isDark ? '#60A5FA' : '#2563EB' }} />
               <span className="text-2xl font-mono font-bold tabular-nums" style={{ color: 'var(--text-main)' }}>
                 {timeLabel}
               </span>
@@ -327,16 +327,23 @@ function MiniStat({ label, value, accent }: { label: string; value: string; acce
   const { isDark } = useTheme();
   return (
     <div
-      className="rounded-xl p-3 border"
+      className="rounded-xl p-3 border transition-all"
       style={{
-        background: accent ? (isDark ? '#1E3A8A' : '#EFF6FF') : 'var(--bg-subtle)',
-        borderColor: accent ? (isDark ? '#1D4ED8' : '#BFDBFE') : 'var(--border-color)',
+        background: accent
+          ? (isDark ? '#1C1C22' : '#EFF6FF')
+          : 'var(--bg-subtle)',
+        borderColor: accent
+          ? (isDark ? '#33333F' : '#BFDBFE')
+          : 'var(--border-color)',
       }}
     >
       <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
         {label}
       </p>
-      <p className="text-sm font-bold tabular-nums" style={{ color: accent ? '#2563EB' : 'var(--text-main)' }}>
+      <p
+        className="text-sm font-bold tabular-nums"
+        style={{ color: accent ? (isDark ? '#60A5FA' : '#2563EB') : 'var(--text-main)' }}
+      >
         {value}
       </p>
     </div>
