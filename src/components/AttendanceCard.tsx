@@ -5,45 +5,12 @@ import { useTheme } from '../ThemeContext';
 import { Subject, SUBJECTS, DAILY_TARGET_HOURS } from '../types';
 import { formatDuration, formatHours, msToHours, calcProductiveMsLive } from '../storage';
 
-function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div
-        className="rounded-2xl shadow-xl p-6 max-w-sm mx-4 w-full border"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
-      >
-        <div className="flex items-start gap-3 mb-4">
-          <AlertTriangle size={22} className="shrink-0 mt-0.5" style={{ color: '#F59E0B' }} />
-          <p className="text-sm" style={{ color: 'var(--text-main)' }}>{message}</p>
-        </div>
-        <div className="flex gap-3 justify-end">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 rounded-xl text-sm font-medium transition-colors border"
-            style={{ color: 'var(--text-secondary)', background: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 rounded-xl text-sm font-semibold transition-colors border"
-            style={{ background: '#FEF2F2', color: '#DC2626', borderColor: '#FECACA' }}
-          >
-            End Session
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function AttendanceCard() {
   const { activeSession, punchIn, pause, resume, punchOut, todayProductiveMs, targetReachedToday } = useApp();
   const { isDark } = useTheme();
 
   const [now, setNow] = useState(new Date());
   const [selectedSubject, setSelectedSubject] = useState<Subject>('Maths');
-  const [showConfirm, setShowConfirm] = useState(false);
   const [liveMs, setLiveMs] = useState(0);
 
   useEffect(() => {
@@ -97,22 +64,10 @@ export default function AttendanceCard() {
     : 0;
 
   return (
-    <>
-      {showConfirm && (
-        <ConfirmDialog
-          message="Are you sure you want to end this study session? The session will be saved to the cloud."
-          onConfirm={() => {
-            punchOut();
-            setShowConfirm(false);
-          }}
-          onCancel={() => setShowConfirm(false)}
-        />
-      )}
-
-      <div
-        className="rounded-2xl border p-6 shadow-sm transition-all"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
-      >
+    <div
+      className="rounded-2xl border p-6 shadow-sm transition-all"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+    >
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
           <div>
@@ -294,7 +249,7 @@ export default function AttendanceCard() {
           {/* Punch Out */}
           {activeSession && (
             <button
-              onClick={() => setShowConfirm(true)}
+              onClick={punchOut}
               className="flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold border transition-all"
               style={{
                 background: isDark ? '#7F1D1D' : '#FEF2F2',
@@ -319,7 +274,6 @@ export default function AttendanceCard() {
           )}
         </div>
       </div>
-    </>
   );
 }
 
