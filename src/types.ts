@@ -22,6 +22,7 @@ export interface StudySession {
   pauses: PauseRecord[];
   status: SessionStatus;
   productiveDurationMs: number; // cached, recalculated on punch out
+  userId?: string;     // set when synced with Supabase
 }
 
 export interface ActiveSessionState {
@@ -33,3 +34,8 @@ export interface ActiveSessionState {
 }
 
 export type NavPage = 'dashboard' | 'analytics' | 'history';
+
+export interface AuthUser {
+  id: string;
+  email: string;
+}
