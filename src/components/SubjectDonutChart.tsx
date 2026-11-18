@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useApp } from '../AppContext';
 import { SUBJECTS } from '../types';
-import { msToHours, formatHours, getWeekStart, dateStr, todayStr, calcSubjectRangeProductiveMs } from '../storage';
+import { msToHours, formatHours, getWeekStart, dateStr, calcSubjectRangeProductiveMs } from '../storage';
 import { subjectHexColor } from './SubjectSummaryTable';
 
 type FilterMode = 'week' | 'month' | 'custom';
@@ -11,10 +11,13 @@ function CustomTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
   const { name, value, percent } = payload[0];
   return (
-    <div className="bg-white border shadow-lg rounded-xl px-3 py-2 text-sm" style={{ borderColor: '#E2E8F0' }}>
-      <p className="font-semibold" style={{ color: '#1E293B' }}>{name}</p>
+    <div
+      className="border shadow-lg rounded-xl px-3 py-2 text-sm"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+    >
+      <p className="font-semibold" style={{ color: 'var(--text-main)' }}>{name}</p>
       <p style={{ color: '#2563EB' }}>{formatHours(value)}</p>
-      <p className="text-xs" style={{ color: '#64748B' }}>{(percent * 100).toFixed(1)}%</p>
+      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{(percent * 100).toFixed(1)}%</p>
     </div>
   );
 }
@@ -57,18 +60,25 @@ export default function SubjectDonutChart() {
   const total = data.reduce((a, d) => a + d.value, 0);
 
   return (
-    <div className="bg-white rounded-2xl border p-5 shadow-sm" style={{ borderColor: '#E2E8F0' }}>
+    <div
+      className="rounded-2xl border p-5 shadow-sm transition-all"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+    >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h2 className="text-base font-semibold" style={{ color: '#1E293B' }}>Subject Distribution</h2>
+        <h2 className="text-base font-semibold" style={{ color: 'var(--text-main)' }}>
+          Subject Distribution
+        </h2>
         <div className="flex items-center gap-1.5 flex-wrap">
           {(['week', 'month', 'custom'] as FilterMode[]).map(m => (
             <button
               key={m}
               onClick={() => setMode(m)}
               className="px-3 py-1 rounded-full text-xs font-semibold border transition-all capitalize"
-              style={mode === m
-                ? { background: '#DBEAFE', color: '#1D4ED8', borderColor: '#BFDBFE' }
-                : { background: '#F8FAFC', color: '#64748B', borderColor: '#E2E8F0' }}
+              style={
+                mode === m
+                  ? { background: 'var(--badge-bg)', color: 'var(--badge-text)', borderColor: 'var(--badge-border)' }
+                  : { background: 'var(--bg-subtle)', color: 'var(--text-secondary)', borderColor: 'var(--border-color)' }
+              }
             >
               {m === 'week' ? 'This Week' : m === 'month' ? 'This Month' : 'Custom'}
             </button>
@@ -82,21 +92,21 @@ export default function SubjectDonutChart() {
             type="date"
             value={customFrom}
             onChange={e => setCustomFrom(e.target.value)}
-            className="border rounded-lg px-3 py-1.5 text-xs outline-none"
-            style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
+            className="border rounded-xl px-3 py-1.5 text-xs outline-none"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)', background: 'var(--input-bg)' }}
           />
           <input
             type="date"
             value={customTo}
             onChange={e => setCustomTo(e.target.value)}
-            className="border rounded-lg px-3 py-1.5 text-xs outline-none"
-            style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
+            className="border rounded-xl px-3 py-1.5 text-xs outline-none"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)', background: 'var(--input-bg)' }}
           />
         </div>
       )}
 
       {data.length === 0 ? (
-        <div className="h-48 flex items-center justify-center text-xs" style={{ color: '#94a3b8' }}>
+        <div className="h-48 flex items-center justify-center text-xs" style={{ color: 'var(--text-muted)' }}>
           No study data recorded for this period
         </div>
       ) : (
@@ -126,16 +136,16 @@ export default function SubjectDonutChart() {
               <div key={d.name} className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold" style={{ color: '#1E293B' }}>{d.name}</p>
-                  <p className="text-xs tabular-nums" style={{ color: '#64748B' }}>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>{d.name}</p>
+                  <p className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
                     {formatHours(d.value)} · {total > 0 ? ((d.value / total) * 100).toFixed(0) : 0}%
                   </p>
                 </div>
               </div>
             ))}
           </div>
-          <p className="text-center text-xs mt-3 font-medium" style={{ color: '#64748B' }}>
-            Total: <span style={{ color: '#1E293B' }}>{formatHours(total)}</span>
+          <p className="text-center text-xs mt-3 font-medium" style={{ color: 'var(--text-secondary)' }}>
+            Total: <span style={{ color: 'var(--text-main)' }}>{formatHours(total)}</span>
           </p>
         </>
       )}

@@ -5,6 +5,7 @@ import {
   ReferenceLine, ResponsiveContainer, Cell
 } from 'recharts';
 import { useApp } from '../AppContext';
+import { useTheme } from '../ThemeContext';
 import { getWeekStart, dateStr, msToHours, getDaysInMonth, todayStr, calcDayProductiveMs } from '../storage';
 import { DAILY_TARGET_HOURS } from '../types';
 
@@ -14,8 +15,13 @@ const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border shadow-lg rounded-xl px-3 py-2 text-sm" style={{ borderColor: '#E2E8F0' }}>
-      <p className="font-semibold mb-0.5" style={{ color: '#1E293B' }}>{label}</p>
+    <div
+      className="border shadow-lg rounded-xl px-3 py-2 text-sm"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+    >
+      <p className="font-semibold mb-0.5" style={{ color: 'var(--text-main)' }}>
+        {label}
+      </p>
       <p className="font-bold text-base" style={{ color: '#2563EB' }}>
         {payload[0].value?.toFixed(2)}h
       </p>
@@ -25,7 +31,8 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export function WeeklyChart() {
   const { sessions, activeSession } = useApp();
-  const [weekOffset, setWeekOffset] = useState(0); // 0 = current, -1 = last, etc.
+  const { isDark } = useTheme();
+  const [weekOffset, setWeekOffset] = useState(0);
   const today = todayStr();
 
   const baseDate = new Date();
@@ -36,7 +43,6 @@ export function WeeklyChart() {
     const d = new Date(weekStart);
     d.setDate(d.getDate() + i);
     const ds = dateStr(d);
-    // Use exact calendar day clipping (handles midnight crossing + live sessions)
     const dayMs = calcDayProductiveMs(sessions, ds === today ? activeSession : null, ds);
     const h = msToHours(dayMs);
     return {
@@ -47,33 +53,39 @@ export function WeeklyChart() {
     };
   });
 
-  const weekLabel = weekOffset === 0
-    ? 'This Week'
-    : weekOffset === -1
-      ? 'Last Week'
-      : `${weekStart.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
+  const weekLabel =
+    weekOffset === 0
+      ? 'This Week'
+      : weekOffset === -1
+        ? 'Last Week'
+        : `${weekStart.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
 
   return (
-    <div className="bg-white rounded-2xl border p-5 shadow-sm" style={{ borderColor: '#E2E8F0' }}>
+    <div
+      className="rounded-2xl border p-5 shadow-sm transition-all"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+    >
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base font-semibold" style={{ color: '#1E293B' }}>Weekly Study Hours</h2>
+        <h2 className="text-base font-semibold" style={{ color: 'var(--text-main)' }}>
+          Weekly Study Hours
+        </h2>
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setWeekOffset(w => w - 1)}
             className="p-1.5 rounded-lg border text-sm transition-all"
-            style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
+            style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
             title="Previous week"
           >
             <ChevronLeft size={15} />
           </button>
-          <span className="text-xs font-semibold px-2 min-w-20 text-center" style={{ color: '#1E293B' }}>
+          <span className="text-xs font-semibold px-2 min-w-20 text-center" style={{ color: 'var(--text-main)' }}>
             {weekLabel}
           </span>
           <button
             onClick={() => setWeekOffset(w => Math.min(0, w + 1))}
             disabled={weekOffset === 0}
             className="p-1.5 rounded-lg border text-sm transition-all disabled:opacity-30"
-            style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
+            style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
             title="Next week"
           >
             <ChevronRight size={15} />
@@ -81,7 +93,7 @@ export function WeeklyChart() {
         </div>
       </div>
 
-      <div className="text-xs mb-3 flex items-center gap-4" style={{ color: '#64748B' }}>
+      <div className="text-xs mb-3 flex items-center gap-4" style={{ color: 'var(--text-secondary)' }}>
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-3 h-3 rounded" style={{ background: '#93C5FD' }} /> Studied
         </span>
@@ -95,9 +107,9 @@ export function WeeklyChart() {
 
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} barSize={28} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-          <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#F1F5F9'} vertical={false} />
+          <XAxis dataKey="day" tick={{ fontSize: 12, fill: isDark ? '#94A3B8' : '#64748B' }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: isDark ? '#94A3B8' : '#64748B' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
           <Tooltip content={<CustomTooltip />} />
           <ReferenceLine y={DAILY_TARGET_HOURS} stroke="#EF4444" strokeDasharray="4 2" strokeWidth={1.5} />
           <Bar dataKey="hours" radius={[6, 6, 0, 0]}>
@@ -109,7 +121,9 @@ export function WeeklyChart() {
                     ? '#2563EB'
                     : entry.hours >= DAILY_TARGET_HOURS
                       ? '#16A34A'
-                      : '#93C5FD'
+                      : isDark
+                        ? '#3B82F6'
+                        : '#93C5FD'
                 }
               />
             ))}
@@ -122,6 +136,7 @@ export function WeeklyChart() {
 
 export function MonthlyChart() {
   const { sessions, activeSession } = useApp();
+  const { isDark } = useTheme();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -164,26 +179,31 @@ export function MonthlyChart() {
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
 
   return (
-    <div className="bg-white rounded-2xl border p-5 shadow-sm" style={{ borderColor: '#E2E8F0' }}>
+    <div
+      className="rounded-2xl border p-5 shadow-sm transition-all"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+    >
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-base font-semibold" style={{ color: '#1E293B' }}>Monthly Study Hours</h2>
+        <h2 className="text-base font-semibold" style={{ color: 'var(--text-main)' }}>
+          Monthly Study Hours
+        </h2>
         <div className="flex items-center gap-1.5">
           <button
             onClick={prevMonth}
             className="p-1.5 rounded-lg border text-sm transition-all"
-            style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
+            style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
             title="Previous month"
           >
             <ChevronLeft size={15} />
           </button>
-          <span className="text-xs font-semibold px-2 min-w-24 text-center" style={{ color: '#1E293B' }}>
+          <span className="text-xs font-semibold px-2 min-w-24 text-center" style={{ color: 'var(--text-main)' }}>
             {MONTH_NAMES[month]} {year}
           </span>
           <button
             onClick={nextMonth}
             disabled={isCurrentMonth}
             className="p-1.5 rounded-lg border text-sm transition-all disabled:opacity-30"
-            style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
+            style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
             title="Next month"
           >
             <ChevronRight size={15} />
@@ -191,23 +211,33 @@ export function MonthlyChart() {
         </div>
       </div>
 
-      <div className="flex gap-4 mb-3 text-xs" style={{ color: '#64748B' }}>
-        <span>Total: <strong style={{ color: '#1E293B' }}>{totalHours.toFixed(1)}h</strong></span>
-        <span>Daily Avg: <strong style={{ color: '#1E293B' }}>{avgHours.toFixed(1)}h</strong></span>
+      <div className="flex gap-4 mb-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+        <span>
+          Total: <strong style={{ color: 'var(--text-main)' }}>{totalHours.toFixed(1)}h</strong>
+        </span>
+        <span>
+          Daily Avg: <strong style={{ color: 'var(--text-main)' }}>{avgHours.toFixed(1)}h</strong>
+        </span>
       </div>
 
       <ResponsiveContainer width="100%" height={200}>
         <BarChart data={data} barSize={Math.max(4, Math.floor(560 / days) - 2)} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-          <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} interval={3} />
-          <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#F1F5F9'} vertical={false} />
+          <XAxis dataKey="day" tick={{ fontSize: 10, fill: isDark ? '#94A3B8' : '#64748B' }} axisLine={false} tickLine={false} interval={3} />
+          <YAxis tick={{ fontSize: 11, fill: isDark ? '#94A3B8' : '#64748B' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
           <Tooltip content={<CustomTooltip />} />
           <ReferenceLine y={DAILY_TARGET_HOURS} stroke="#EF4444" strokeDasharray="4 2" strokeWidth={1.5} />
           <Bar dataKey="hours" radius={[3, 3, 0, 0]}>
             {data.map((entry, i) => (
               <Cell
                 key={i}
-                fill={entry.hours >= DAILY_TARGET_HOURS ? '#16A34A' : '#93C5FD'}
+                fill={
+                  entry.hours >= DAILY_TARGET_HOURS
+                    ? '#16A34A'
+                    : isDark
+                      ? '#3B82F6'
+                      : '#93C5FD'
+                }
               />
             ))}
           </Bar>

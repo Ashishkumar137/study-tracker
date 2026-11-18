@@ -1,6 +1,7 @@
 import React from 'react';
 import { Clock, Target, TrendingUp, Calendar, BookOpen, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../AppContext';
+import { useTheme } from '../ThemeContext';
 import { formatHours, msToHours, todayStr, getDaysInMonth, getWeekStart, dateStr, calcDayProductiveMs } from '../storage';
 import { DAILY_TARGET_HOURS } from '../types';
 
@@ -14,35 +15,46 @@ function StatCard({
   accent?: boolean;
   achieved?: boolean;
 }) {
+  const { isDark } = useTheme();
+
   return (
     <div
-      className="rounded-2xl border p-5 bg-white shadow-sm flex flex-col gap-2 transition-all"
+      className="rounded-2xl border p-5 shadow-sm flex flex-col gap-2 transition-all"
       style={{
-        borderColor: achieved ? '#BBF7D0' : '#E2E8F0',
-        background: '#FFFFFF',
+        borderColor: achieved ? (isDark ? '#047857' : '#BBF7D0') : 'var(--border-color)',
+        background: 'var(--bg-card)',
       }}
     >
       <div
-        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border"
         style={{
-          background: achieved ? '#DCFCE7' : accent ? '#DBEAFE' : '#F1F5F9',
+          background: achieved
+            ? (isDark ? '#064E3B' : '#DCFCE7')
+            : accent
+              ? (isDark ? '#1E3A8A' : '#DBEAFE')
+              : 'var(--bg-subtle)',
+          borderColor: achieved
+            ? (isDark ? '#047857' : '#BBF7D0')
+            : accent
+              ? (isDark ? '#1D4ED8' : '#BFDBFE')
+              : 'var(--border-color)',
         }}
       >
-        <span style={{ color: achieved ? '#16A34A' : accent ? '#2563EB' : '#64748B' }}>
+        <span style={{ color: achieved ? '#16A34A' : accent ? '#2563EB' : 'var(--text-secondary)' }}>
           {icon}
         </span>
       </div>
       <div>
-        <p className="text-xs font-medium" style={{ color: '#64748B' }}>{label}</p>
+        <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</p>
         <p
           className="text-2xl font-bold mt-0.5 tabular-nums"
           style={{
-            color: achieved ? '#16A34A' : accent ? '#2563EB' : '#1E293B',
+            color: achieved ? '#16A34A' : accent ? '#2563EB' : 'var(--text-main)',
           }}
         >
           {value}
         </p>
-        {sub && <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>{sub}</p>}
+        {sub && <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{sub}</p>}
       </div>
       {achieved && (
         <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#16A34A' }}>
@@ -63,7 +75,7 @@ export default function SummaryCards() {
   const todayHours = msToHours(todayProductiveMs);
   const targetAchieved = todayHours >= DAILY_TARGET_HOURS;
 
-  // Count sessions today (sessions that have date === today or overlap with today)
+  // Count sessions today
   const todaySessionsCount = sessions.filter(s => s.status === 'completed' && s.date === today).length
     + (activeSession ? 1 : 0);
 
@@ -97,7 +109,7 @@ export default function SummaryCards() {
     const dayMs = ds === today ? todayProductiveMs : calcDayProductiveMs(sessions, null, ds);
     const dayH = msToHours(dayMs);
     monthTotalHours += dayH;
-    if (dayH > 0.05) { // more than 3 minutes counts as active study day
+    if (dayH > 0.05) {
       activeStudyDays++;
     }
   }

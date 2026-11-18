@@ -12,17 +12,20 @@ function ConfirmDialog({
   message, onConfirm, onCancel
 }: { message: string; onConfirm: () => void; onCancel: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm mx-4 w-full border" style={{ borderColor: '#E2E8F0' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div
+        className="rounded-2xl shadow-xl p-6 max-w-sm mx-4 w-full border"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+      >
         <div className="flex items-start gap-3 mb-4">
           <AlertTriangle size={22} className="shrink-0 mt-0.5" style={{ color: '#F59E0B' }} />
-          <p className="text-sm" style={{ color: '#1E293B' }}>{message}</p>
+          <p className="text-sm" style={{ color: 'var(--text-main)' }}>{message}</p>
         </div>
         <div className="flex gap-3 justify-end">
           <button
             onClick={onCancel}
             className="px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
-            style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
+            style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
           >
             Cancel
           </button>
@@ -47,7 +50,6 @@ function AddSessionModal({ onSave, onClose }: {
   const pad = (n: number) => String(n).padStart(2, '0');
   const defaultDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
-  // Default to 30 mins ago to now
   const thirtyMinsAgo = new Date(now.getTime() - 30 * 60 * 1000);
   const defaultStart = `${defaultDate}T${pad(thirtyMinsAgo.getHours())}:${pad(thirtyMinsAgo.getMinutes())}`;
   const defaultEnd = `${defaultDate}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -90,14 +92,17 @@ function AddSessionModal({ onSave, onClose }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md mx-4 w-full border" style={{ borderColor: '#E2E8F0' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div
+        className="rounded-2xl shadow-xl p-6 max-w-md mx-4 w-full border"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+      >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold" style={{ color: '#1E293B' }}>Add Past Study Session</h3>
+          <h3 className="text-base font-semibold" style={{ color: 'var(--text-main)' }}>Add Past Study Session</h3>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
-            style={{ color: '#94A3B8' }}
+            className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            style={{ color: 'var(--text-muted)' }}
           >
             <X size={18} />
           </button>
@@ -105,34 +110,38 @@ function AddSessionModal({ onSave, onClose }: {
 
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-semibold mb-1 block" style={{ color: '#64748B' }}>Subject</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-secondary)' }}>Subject</label>
             <select
               value={subject}
               onChange={e => setSubject(e.target.value as Subject)}
               className="w-full border rounded-xl px-3 py-2 text-sm outline-none"
-              style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)', background: 'var(--input-bg)' }}
             >
-              {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+              {SUBJECTS.map(s => (
+                <option key={s} value={s} style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>
+                  {s}
+                </option>
+              ))}
             </select>
           </div>
           <div>
-            <label className="text-xs font-semibold mb-1 block" style={{ color: '#64748B' }}>Punch In Time</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-secondary)' }}>Punch In Time</label>
             <input
               type="datetime-local"
               value={startTime}
               onChange={e => setStartTime(e.target.value)}
               className="w-full border rounded-xl px-3 py-2 text-sm outline-none"
-              style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)', background: 'var(--input-bg)' }}
             />
           </div>
           <div>
-            <label className="text-xs font-semibold mb-1 block" style={{ color: '#64748B' }}>Punch Out Time</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-secondary)' }}>Punch Out Time</label>
             <input
               type="datetime-local"
               value={endTime}
               onChange={e => setEndTime(e.target.value)}
               className="w-full border rounded-xl px-3 py-2 text-sm outline-none"
-              style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)', background: 'var(--input-bg)' }}
             />
           </div>
           {error && (
@@ -146,14 +155,14 @@ function AddSessionModal({ onSave, onClose }: {
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
-            style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
+            style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             className="px-4 py-2 rounded-xl text-sm font-semibold border transition-colors"
-            style={{ background: '#DBEAFE', borderColor: '#BFDBFE', color: '#1D4ED8' }}
+            style={{ background: 'var(--badge-bg)', borderColor: 'var(--badge-border)', color: 'var(--badge-text)' }}
           >
             Save Session to Cloud
           </button>
@@ -212,14 +221,17 @@ function EditModal({ session, onSave, onClose }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md mx-4 w-full border" style={{ borderColor: '#E2E8F0' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div
+        className="rounded-2xl shadow-xl p-6 max-w-md mx-4 w-full border"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+      >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold" style={{ color: '#1E293B' }}>Edit Study Session</h3>
+          <h3 className="text-base font-semibold" style={{ color: 'var(--text-main)' }}>Edit Study Session</h3>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
-            style={{ color: '#94A3B8' }}
+            className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            style={{ color: 'var(--text-muted)' }}
           >
             <X size={18} />
           </button>
@@ -227,34 +239,38 @@ function EditModal({ session, onSave, onClose }: {
 
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-semibold mb-1 block" style={{ color: '#64748B' }}>Subject</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-secondary)' }}>Subject</label>
             <select
               value={subject}
               onChange={e => setSubject(e.target.value as Subject)}
               className="w-full border rounded-xl px-3 py-2 text-sm outline-none"
-              style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)', background: 'var(--input-bg)' }}
             >
-              {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+              {SUBJECTS.map(s => (
+                <option key={s} value={s} style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>
+                  {s}
+                </option>
+              ))}
             </select>
           </div>
           <div>
-            <label className="text-xs font-semibold mb-1 block" style={{ color: '#64748B' }}>Punch In Time</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-secondary)' }}>Punch In Time</label>
             <input
               type="datetime-local"
               value={startTime}
               onChange={e => setStartTime(e.target.value)}
               className="w-full border rounded-xl px-3 py-2 text-sm outline-none"
-              style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)', background: 'var(--input-bg)' }}
             />
           </div>
           <div>
-            <label className="text-xs font-semibold mb-1 block" style={{ color: '#64748B' }}>Punch Out Time</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-secondary)' }}>Punch Out Time</label>
             <input
               type="datetime-local"
               value={endTime}
               onChange={e => setEndTime(e.target.value)}
               className="w-full border rounded-xl px-3 py-2 text-sm outline-none"
-              style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)', background: 'var(--input-bg)' }}
             />
           </div>
           {error && (
@@ -268,14 +284,14 @@ function EditModal({ session, onSave, onClose }: {
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
-            style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
+            style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             className="px-4 py-2 rounded-xl text-sm font-semibold border transition-colors"
-            style={{ background: '#DBEAFE', borderColor: '#BFDBFE', color: '#1D4ED8' }}
+            style={{ background: 'var(--badge-bg)', borderColor: 'var(--badge-border)', color: 'var(--badge-text)' }}
           >
             Save Changes
           </button>
@@ -334,17 +350,20 @@ export default function HistoryTable() {
         />
       )}
 
-      <div className="bg-white rounded-2xl border shadow-sm overflow-hidden" style={{ borderColor: '#E2E8F0' }}>
+      <div
+        className="rounded-2xl border shadow-sm overflow-hidden transition-all"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+      >
         {/* Header + Filters + Add Button */}
-        <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center gap-3" style={{ borderColor: '#E2E8F0' }}>
+        <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center gap-3" style={{ borderColor: 'var(--border-color)' }}>
           <div className="flex-1 flex items-center gap-3">
-            <h2 className="text-base font-semibold" style={{ color: '#1E293B' }}>Attendance History</h2>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-main)' }}>Attendance History</h2>
             <button
               onClick={() => setShowAddModal(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all"
-              style={{ background: '#EFF6FF', borderColor: '#BFDBFE', color: '#2563EB' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#DBEAFE')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#EFF6FF')}
+              style={{ background: 'var(--badge-bg)', borderColor: 'var(--badge-border)', color: 'var(--badge-text)' }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
             >
               <Plus size={14} />
               <span>Add Past Session</span>
@@ -356,25 +375,25 @@ export default function HistoryTable() {
                 value={filterSubject}
                 onChange={e => setFilterSubject(e.target.value as Subject | 'All')}
                 className="appearance-none pl-3 pr-7 py-1.5 rounded-xl border text-xs font-semibold outline-none transition-all"
-                style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#1E293B' }}
+                style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
               >
-                <option value="All">All Subjects</option>
-                {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                <option value="All" style={{ background: 'var(--bg-card)' }}>All Subjects</option>
+                {SUBJECTS.map(s => <option key={s} value={s} style={{ background: 'var(--bg-card)' }}>{s}</option>)}
               </select>
-              <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#94a3b8' }} />
+              <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
             </div>
             <input
               type="date"
               value={filterDate}
               onChange={e => setFilterDate(e.target.value)}
               className="border rounded-xl px-3 py-1.5 text-xs outline-none"
-              style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#1E293B' }}
+              style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}
             />
             {filterDate && (
               <button
                 onClick={() => setFilterDate('')}
                 className="p-1.5 rounded-lg border text-xs transition-colors"
-                style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
+                style={{ background: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
                 title="Clear date filter"
               >
                 <X size={13} />
@@ -386,12 +405,12 @@ export default function HistoryTable() {
         {/* Table */}
         <div className="overflow-x-auto">
           {completed.length === 0 ? (
-            <div className="py-12 text-center text-sm" style={{ color: '#94a3b8' }}>
+            <div className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
               <p>No completed sessions found for this filter.</p>
               <button
                 onClick={() => setShowAddModal(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 mt-3 rounded-xl text-xs font-semibold border transition-all"
-                style={{ background: '#EFF6FF', borderColor: '#BFDBFE', color: '#2563EB' }}
+                style={{ background: 'var(--badge-bg)', borderColor: 'var(--badge-border)', color: 'var(--badge-text)' }}
               >
                 <Plus size={13} />
                 <span>Add your first study session</span>
@@ -402,7 +421,7 @@ export default function HistoryTable() {
               <thead>
                 <tr
                   className="text-xs font-semibold uppercase tracking-wide border-b"
-                  style={{ background: '#F8FAFC', color: '#64748B', borderColor: '#E2E8F0' }}
+                  style={{ background: 'var(--bg-subtle)', color: 'var(--text-secondary)', borderColor: 'var(--border-color)' }}
                 >
                   <th className="text-left px-5 py-3">Date</th>
                   <th className="text-left px-4 py-3">Subject</th>
@@ -422,25 +441,25 @@ export default function HistoryTable() {
                       key={s.id}
                       className="border-t transition-colors"
                       style={{
-                        borderColor: '#F1F5F9',
-                        background: i % 2 === 0 ? '#FFFFFF' : '#FAFAFA',
+                        borderColor: 'var(--border-color)',
+                        background: i % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-subtle)',
                       }}
                     >
-                      <td className="px-5 py-3 whitespace-nowrap" style={{ color: '#1E293B' }}>
+                      <td className="px-5 py-3 whitespace-nowrap" style={{ color: 'var(--text-main)' }}>
                         {fmtDate(s.date)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <div className={`w-2 h-2 rounded-full shrink-0 ${subjectColor(s.subject)}`} />
-                          <span style={{ color: '#1E293B' }}>{s.subject}</span>
+                          <span style={{ color: 'var(--text-main)' }}>{s.subject}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 tabular-nums" style={{ color: '#64748B' }}>{fmt(s.startTime)}</td>
-                      <td className="px-4 py-3 tabular-nums" style={{ color: '#64748B' }}>{s.endTime ? fmt(s.endTime) : '—'}</td>
-                      <td className="px-4 py-3 tabular-nums text-right" style={{ color: '#94a3b8' }}>
+                      <td className="px-4 py-3 tabular-nums" style={{ color: 'var(--text-secondary)' }}>{fmt(s.startTime)}</td>
+                      <td className="px-4 py-3 tabular-nums" style={{ color: 'var(--text-secondary)' }}>{s.endTime ? fmt(s.endTime) : '—'}</td>
+                      <td className="px-4 py-3 tabular-nums text-right" style={{ color: 'var(--text-muted)' }}>
                         {breakMs > 0 ? formatDuration(breakMs) : '—'}
                       </td>
-                      <td className="px-4 py-3 tabular-nums text-right font-semibold" style={{ color: '#1E293B' }}>
+                      <td className="px-4 py-3 tabular-nums text-right font-semibold" style={{ color: 'var(--text-main)' }}>
                         {formatDuration(s.productiveDurationMs)}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -457,7 +476,7 @@ export default function HistoryTable() {
                           <button
                             onClick={() => setEditTarget(s)}
                             className="p-1.5 rounded-lg border transition-colors"
-                            style={{ background: '#EFF6FF', borderColor: '#BFDBFE', color: '#2563EB' }}
+                            style={{ background: 'var(--badge-bg)', borderColor: 'var(--badge-border)', color: 'var(--badge-text)' }}
                             title="Edit session"
                           >
                             <Pencil size={13} />
@@ -482,7 +501,7 @@ export default function HistoryTable() {
 
         {/* Footer */}
         {completed.length > 0 && (
-          <div className="px-5 py-3 border-t text-xs" style={{ borderColor: '#E2E8F0', color: '#94a3b8' }}>
+          <div className="px-5 py-3 border-t text-xs" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>
             Showing {completed.length} session{completed.length !== 1 ? 's' : ''} stored in cloud
           </div>
         )}
