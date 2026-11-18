@@ -1,8 +1,8 @@
 import React from 'react';
 import { Clock, Target, TrendingUp, Calendar, BookOpen, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../AppContext';
-import { formatHours, msToHours, todayStr, getDaysInMonth, getWeekStart, dateStr } from '../storage';
-import { DAILY_TARGET_HOURS, SUBJECTS } from '../types';
+import { formatHours, msToHours, todayStr, getDaysInMonth, getWeekStart, dateStr, calcDayProductiveMs } from '../storage';
+import { DAILY_TARGET_HOURS } from '../types';
 
 function StatCard({
   icon, label, value, sub, accent, achieved
@@ -15,23 +15,37 @@ function StatCard({
   achieved?: boolean;
 }) {
   return (
-    <div className={`rounded-2xl border p-5 bg-white shadow-sm flex flex-col gap-2
-      ${achieved ? 'border-green-200' : 'border-gray-200'}`}>
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center
-        ${achieved ? 'bg-green-100' : accent ? 'bg-indigo-100' : 'bg-gray-100'}`}>
-        <span className={achieved ? 'text-green-600' : accent ? 'text-indigo-600' : 'text-gray-500'}>
+    <div
+      className="rounded-2xl border p-5 bg-white shadow-sm flex flex-col gap-2 transition-all"
+      style={{
+        borderColor: achieved ? '#BBF7D0' : '#E2E8F0',
+        background: '#FFFFFF',
+      }}
+    >
+      <div
+        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+        style={{
+          background: achieved ? '#DCFCE7' : accent ? '#DBEAFE' : '#F1F5F9',
+        }}
+      >
+        <span style={{ color: achieved ? '#16A34A' : accent ? '#2563EB' : '#64748B' }}>
           {icon}
         </span>
       </div>
       <div>
-        <p className="text-xs text-gray-500 font-medium">{label}</p>
-        <p className={`text-2xl font-bold mt-0.5 ${achieved ? 'text-green-700' : accent ? 'text-indigo-700' : 'text-gray-900'}`}>
+        <p className="text-xs font-medium" style={{ color: '#64748B' }}>{label}</p>
+        <p
+          className="text-2xl font-bold mt-0.5 tabular-nums"
+          style={{
+            color: achieved ? '#16A34A' : accent ? '#2563EB' : '#1E293B',
+          }}
+        >
           {value}
         </p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+        {sub && <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>{sub}</p>}
       </div>
       {achieved && (
-        <div className="flex items-center gap-1 text-green-600 text-xs font-semibold">
+        <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#16A34A' }}>
           <CheckCircle2 size={13} />
           Target Achieved!
         </div>
@@ -47,63 +61,48 @@ export default function SummaryCards() {
 
   // Today stats
   const todayHours = msToHours(todayProductiveMs);
-  const todaySessions = sessions.filter(s => s.date === today && s.status === 'completed').length
-    + (activeSession ? 1 : 0);
   const targetAchieved = todayHours >= DAILY_TARGET_HOURS;
 
-  // Weekly average
+  // Count sessions today (sessions that have date === today or overlap with today)
+  const todaySessionsCount = sessions.filter(s => s.status === 'completed' && s.date === today).length
+    + (activeSession ? 1 : 0);
+
+  // Weekly average (Mon - Sun of current week)
   const weekStart = getWeekStart(now);
-  let weekTotal = 0;
+  let weekTotalHours = 0;
+  let weekDaysReached = 0;
+
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekStart);
     d.setDate(d.getDate() + i);
     const ds = dateStr(d);
-    if (ds === today) {
-      weekTotal += todayProductiveMs / 3600000;
-    } else {
-      const dayMs = sessions.filter(s => s.date === ds && s.status === 'completed')
-        .reduce((a, s) => a + s.productiveDurationMs, 0);
-      weekTotal += dayMs / 3600000;
+    const dayMs = ds === today ? todayProductiveMs : calcDayProductiveMs(sessions, null, ds);
+    const dayH = msToHours(dayMs);
+    weekTotalHours += dayH;
+    if (dayH >= DAILY_TARGET_HOURS) {
+      weekDaysReached++;
     }
   }
-  const weekAvg = weekTotal / 7;
-
-  // Weekly consistency (days reaching target)
-  let weekDaysReached = 0;
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    const ds = dateStr(d);
-    const dayHours = ds === today
-      ? todayHours
-      : msToHours(sessions.filter(s => s.date === ds && s.status === 'completed').reduce((a, s) => a + s.productiveDurationMs, 0));
-    if (dayHours >= DAILY_TARGET_HOURS) weekDaysReached++;
-  }
+  const weekAvg = weekTotalHours / 7;
 
   // Monthly average
   const year = now.getFullYear();
   const month = now.getMonth();
   const daysInMonth = getDaysInMonth(year, month);
-  let monthTotal = 0;
+  let monthTotalHours = 0;
+  let activeStudyDays = 0;
+
   for (let d = 1; d <= daysInMonth; d++) {
     const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    if (ds === today) {
-      monthTotal += todayProductiveMs / 3600000;
-    } else {
-      const dayMs = sessions.filter(s => s.date === ds && s.status === 'completed')
-        .reduce((a, s) => a + s.productiveDurationMs, 0);
-      monthTotal += dayMs / 3600000;
+    const dayMs = ds === today ? todayProductiveMs : calcDayProductiveMs(sessions, null, ds);
+    const dayH = msToHours(dayMs);
+    monthTotalHours += dayH;
+    if (dayH > 0.05) { // more than 3 minutes counts as active study day
+      activeStudyDays++;
     }
   }
-  const monthAvg = monthTotal / daysInMonth;
-
-  // Active study days this month
-  const studyDays = new Set<string>();
-  sessions.filter(s => s.status === 'completed' && s.date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`))
-    .forEach(s => studyDays.add(s.date));
-  if (today.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`) && todayHours > 0) studyDays.add(today);
-  const activeStudyDays = studyDays.size;
-  const monthAvgActiveDay = activeStudyDays > 0 ? monthTotal / activeStudyDays : 0;
+  const monthAvg = monthTotalHours / daysInMonth;
+  const monthAvgActiveDay = activeStudyDays > 0 ? monthTotalHours / activeStudyDays : 0;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -111,7 +110,7 @@ export default function SummaryCards() {
         icon={<Clock size={18} />}
         label="Productive Today"
         value={formatHours(todayHours)}
-        sub={`${Math.round(todayHours * 60)} min`}
+        sub={`${Math.round(todayHours * 60)} min total`}
         accent
         achieved={targetAchieved}
       />
@@ -119,13 +118,13 @@ export default function SummaryCards() {
         icon={<Target size={18} />}
         label="Daily Target"
         value={`${DAILY_TARGET_HOURS}h`}
-        sub="Minimum goal"
+        sub="Minimum daily goal"
       />
       <StatCard
         icon={<Clock size={18} />}
         label="Remaining"
         value={targetAchieved ? '✓ Done' : formatHours(Math.max(0, DAILY_TARGET_HOURS - todayHours))}
-        sub={targetAchieved ? 'Target achieved' : 'to reach target'}
+        sub={targetAchieved ? 'Target achieved!' : 'to reach 10h target'}
         achieved={targetAchieved}
       />
       <StatCard
@@ -138,12 +137,12 @@ export default function SummaryCards() {
         icon={<Calendar size={18} />}
         label="Monthly Avg"
         value={formatHours(monthAvg)}
-        sub={`${formatHours(monthAvgActiveDay)}/active day`}
+        sub={`${formatHours(monthAvgActiveDay)}/active day (${activeStudyDays}d)`}
       />
       <StatCard
         icon={<BookOpen size={18} />}
         label="Sessions Today"
-        value={String(todaySessions)}
+        value={String(todaySessionsCount)}
         sub={`Week: ${weekDaysReached} days on target`}
       />
     </div>

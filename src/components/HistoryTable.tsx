@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import {
-  Trash2, Pencil, Filter, CheckCircle2, XCircle,
+  Trash2, Pencil, CheckCircle2, XCircle,
   AlertTriangle, ChevronDown, X
 } from 'lucide-react';
 import { useApp } from '../AppContext';
 import { StudySession, Subject, SUBJECTS } from '../types';
-import { formatDuration, calcPausedMs, msToHours } from '../storage';
+import { formatDuration, calcPausedMs, dateStr } from '../storage';
 import { subjectColor } from './SubjectSummaryTable';
 
 function ConfirmDialog({
@@ -13,14 +13,26 @@ function ConfirmDialog({
 }: { message: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm mx-4 w-full">
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm mx-4 w-full border" style={{ borderColor: '#E2E8F0' }}>
         <div className="flex items-start gap-3 mb-4">
-          <AlertTriangle size={22} className="text-amber-500 mt-0.5 shrink-0" />
-          <p className="text-gray-700 text-sm">{message}</p>
+          <AlertTriangle size={22} className="shrink-0 mt-0.5" style={{ color: '#F59E0B' }} />
+          <p className="text-sm" style={{ color: '#1E293B' }}>{message}</p>
         </div>
         <div className="flex gap-3 justify-end">
-          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Cancel</button>
-          <button onClick={onConfirm} className="px-4 py-2 rounded-lg text-sm font-medium bg-rose-600 text-white hover:bg-rose-700">Delete</button>
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
+            style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-xl text-sm font-semibold border transition-colors"
+            style={{ background: '#FEF2F2', borderColor: '#FECACA', color: '#DC2626' }}
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>
@@ -44,19 +56,31 @@ function EditModal({ session, onSave, onClose }: {
   }
 
   const handleSave = () => {
-    if (!startTime || !endTime) { setError('Start and end time are required.'); return; }
+    if (!startTime || !endTime) {
+      setError('Start and end time are both required.');
+      return;
+    }
     const st = new Date(startTime);
     const et = new Date(endTime);
-    if (et <= st) { setError('End time must be after start time.'); return; }
+    if (isNaN(st.getTime()) || isNaN(et.getTime())) {
+      setError('Invalid date/time format.');
+      return;
+    }
+    if (et <= st) {
+      setError('End time must be after start time.');
+      return;
+    }
+
     const totalMs = et.getTime() - st.getTime();
-    const pausedMs = calcPausedMs(session.pauses);
+    const pausedMs = calcPausedMs(session.pauses, et.getTime());
     const productiveDurationMs = Math.max(0, totalMs - pausedMs);
+
     onSave({
       ...session,
       subject,
       startTime: st.toISOString(),
       endTime: et.toISOString(),
-      date: st.toISOString().slice(0, 10),
+      date: dateStr(st), // local date
       productiveDurationMs,
       status: 'completed',
     });
@@ -65,45 +89,72 @@ function EditModal({ session, onSave, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md mx-4 w-full">
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md mx-4 w-full border" style={{ borderColor: '#E2E8F0' }}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold text-gray-900">Edit Session</h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
+          <h3 className="text-base font-semibold" style={{ color: '#1E293B' }}>Edit Study Session</h3>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+            style={{ color: '#94a3b8' }}
+          >
+            <X size={18} />
+          </button>
         </div>
+
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-gray-500 font-medium mb-1 block">Subject</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: '#64748B' }}>Subject</label>
             <select
               value={subject}
               onChange={e => setSubject(e.target.value as Subject)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="w-full border rounded-xl px-3 py-2 text-sm outline-none"
+              style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
             >
               {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs text-gray-500 font-medium mb-1 block">Start Time</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: '#64748B' }}>Punch In Time</label>
             <input
               type="datetime-local"
               value={startTime}
               onChange={e => setStartTime(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="w-full border rounded-xl px-3 py-2 text-sm outline-none"
+              style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
             />
           </div>
           <div>
-            <label className="text-xs text-gray-500 font-medium mb-1 block">End Time</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: '#64748B' }}>Punch Out Time</label>
             <input
               type="datetime-local"
               value={endTime}
               onChange={e => setEndTime(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="w-full border rounded-xl px-3 py-2 text-sm outline-none"
+              style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
             />
           </div>
-          {error && <p className="text-xs text-rose-600">{error}</p>}
+          {error && (
+            <p className="text-xs rounded-lg p-2" style={{ background: '#FEF2F2', color: '#DC2626' }}>
+              {error}
+            </p>
+          )}
         </div>
+
         <div className="flex gap-3 justify-end mt-5">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Cancel</button>
-          <button onClick={handleSave} className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700">Save Changes</button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
+            style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 rounded-xl text-sm font-semibold border transition-colors"
+            style={{ background: '#DBEAFE', borderColor: '#BFDBFE', color: '#1D4ED8' }}
+          >
+            Save Changes
+          </button>
         </div>
       </div>
     </div>
@@ -123,15 +174,24 @@ export default function HistoryTable() {
     .filter(s => !filterDate || s.date === filterDate)
     .sort((a, b) => b.startTime.localeCompare(a.startTime));
 
-  const fmt = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-  const fmtDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const fmtDate = (dStr: string) => {
+    const [y, m, d] = dStr.split('-').map(Number);
+    if (!y || !m || !d) return dStr;
+    const dateObj = new Date(y, m - 1, d);
+    return dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
 
   return (
     <>
       {deleteTarget && (
         <ConfirmDialog
-          message="Delete this session? This action cannot be undone."
-          onConfirm={() => { deleteSession(deleteTarget!); setDeleteTarget(null); }}
+          message="Delete this session from your cloud records? This action cannot be undone."
+          onConfirm={() => { deleteSession(deleteTarget); setDeleteTarget(null); }}
           onCancel={() => setDeleteTarget(null)}
         />
       )}
@@ -143,31 +203,38 @@ export default function HistoryTable() {
         />
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border shadow-sm overflow-hidden" style={{ borderColor: '#E2E8F0' }}>
         {/* Header + Filters */}
-        <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3">
-          <h2 className="text-base font-semibold text-gray-900 flex-1">Attendance History</h2>
+        <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center gap-3" style={{ borderColor: '#E2E8F0' }}>
+          <h2 className="text-base font-semibold flex-1" style={{ color: '#1E293B' }}>Attendance History</h2>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative">
               <select
                 value={filterSubject}
                 onChange={e => setFilterSubject(e.target.value as Subject | 'All')}
-                className="appearance-none pl-3 pr-7 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                className="appearance-none pl-3 pr-7 py-1.5 rounded-xl border text-xs font-semibold outline-none transition-all"
+                style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#1E293B' }}
               >
                 <option value="All">All Subjects</option>
                 {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#94a3b8' }} />
             </div>
             <input
               type="date"
               value={filterDate}
               onChange={e => setFilterDate(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="border rounded-xl px-3 py-1.5 text-xs outline-none"
+              style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#1E293B' }}
             />
             {filterDate && (
-              <button onClick={() => setFilterDate('')} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
-                <X size={14} />
+              <button
+                onClick={() => setFilterDate('')}
+                className="p-1.5 rounded-lg border text-xs transition-colors"
+                style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
+                title="Clear date filter"
+              >
+                <X size={13} />
               </button>
             )}
           </div>
@@ -176,13 +243,16 @@ export default function HistoryTable() {
         {/* Table */}
         <div className="overflow-x-auto">
           {completed.length === 0 ? (
-            <div className="py-12 text-center text-gray-400 text-sm">
-              No sessions found.
+            <div className="py-12 text-center text-sm" style={{ color: '#94a3b8' }}>
+              No completed sessions found for this filter.
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-gray-500 text-xs font-semibold uppercase tracking-wide">
+                <tr
+                  className="text-xs font-semibold uppercase tracking-wide border-b"
+                  style={{ background: '#F8FAFC', color: '#64748B', borderColor: '#E2E8F0' }}
+                >
                   <th className="text-left px-5 py-3">Date</th>
                   <th className="text-left px-4 py-3">Subject</th>
                   <th className="text-left px-4 py-3">Punch In</th>
@@ -197,40 +267,57 @@ export default function HistoryTable() {
                 {completed.map((s, i) => {
                   const breakMs = calcPausedMs(s.pauses);
                   return (
-                    <tr key={s.id} className={`border-t border-gray-100 ${i % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
-                      <td className="px-5 py-3 text-gray-700 whitespace-nowrap">{fmtDate(s.date)}</td>
+                    <tr
+                      key={s.id}
+                      className="border-t transition-colors"
+                      style={{
+                        borderColor: '#F1F5F9',
+                        background: i % 2 === 0 ? '#FFFFFF' : '#FAFAFA',
+                      }}
+                    >
+                      <td className="px-5 py-3 whitespace-nowrap" style={{ color: '#1E293B' }}>
+                        {fmtDate(s.date)}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <div className={`w-2 h-2 rounded-full shrink-0 ${subjectColor(s.subject)}`} />
-                          <span className="text-gray-700">{s.subject}</span>
+                          <span style={{ color: '#1E293B' }}>{s.subject}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 tabular-nums text-gray-700">{fmt(s.startTime)}</td>
-                      <td className="px-4 py-3 tabular-nums text-gray-700">{s.endTime ? fmt(s.endTime) : '—'}</td>
-                      <td className="px-4 py-3 tabular-nums text-right text-gray-500">{breakMs > 0 ? formatDuration(breakMs) : '—'}</td>
-                      <td className="px-4 py-3 tabular-nums text-right font-medium text-gray-900">{formatDuration(s.productiveDurationMs)}</td>
+                      <td className="px-4 py-3 tabular-nums" style={{ color: '#64748B' }}>{fmt(s.startTime)}</td>
+                      <td className="px-4 py-3 tabular-nums" style={{ color: '#64748B' }}>{s.endTime ? fmt(s.endTime) : '—'}</td>
+                      <td className="px-4 py-3 tabular-nums text-right" style={{ color: '#94a3b8' }}>
+                        {breakMs > 0 ? formatDuration(breakMs) : '—'}
+                      </td>
+                      <td className="px-4 py-3 tabular-nums text-right font-semibold" style={{ color: '#1E293B' }}>
+                        {formatDuration(s.productiveDurationMs)}
+                      </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full
-                          ${s.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                          {s.status === 'completed' ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                          style={{ background: '#DCFCE7', color: '#16A34A' }}
+                        >
+                          <CheckCircle2 size={11} />
                           {s.status}
                         </span>
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => setEditTarget(s)}
-                            className="p-1.5 rounded-lg hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 transition-colors"
+                            className="p-1.5 rounded-lg border transition-colors"
+                            style={{ background: '#EFF6FF', borderColor: '#BFDBFE', color: '#2563EB' }}
                             title="Edit session"
                           >
-                            <Pencil size={14} />
+                            <Pencil size={13} />
                           </button>
                           <button
                             onClick={() => setDeleteTarget(s.id)}
-                            className="p-1.5 rounded-lg hover:bg-rose-50 text-gray-400 hover:text-rose-600 transition-colors"
+                            className="p-1.5 rounded-lg border transition-colors"
+                            style={{ background: '#FEF2F2', borderColor: '#FECACA', color: '#DC2626' }}
                             title="Delete session"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       </td>
@@ -244,8 +331,8 @@ export default function HistoryTable() {
 
         {/* Footer */}
         {completed.length > 0 && (
-          <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-400">
-            Showing {completed.length} session{completed.length !== 1 ? 's' : ''}
+          <div className="px-5 py-3 border-t text-xs" style={{ borderColor: '#E2E8F0', color: '#94a3b8' }}>
+            Showing {completed.length} session{completed.length !== 1 ? 's' : ''} stored in cloud
           </div>
         )}
       </div>

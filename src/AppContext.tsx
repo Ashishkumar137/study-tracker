@@ -8,11 +8,14 @@ import {
   loadActiveSession as loadLocalActive,
   saveActiveSession as saveLocalActive,
   clearActiveSession as clearLocalActive,
-  calcPausedMs, calcProductiveMsLive,
-  msToHours, generateId, todayStr,
+  calcPausedMs, calcDayProductiveMs,
+  msToHours, generateId, todayStr, dateStr,
 } from './storage';
-import { fetchSessions, upsertSessionDb, deleteSessionDb } from './db';
+import { fetchSessions, upsertSessionDb, deleteSessionDb, dbToSession, DbSession } from './db';
 import { useAuth } from './AuthContext';
+import { supabase } from './supabaseClient';
+
+export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error';
 
 interface AppContextValue {
   sessions: StudySession[];
@@ -20,12 +23,13 @@ interface AppContextValue {
   todayProductiveMs: number;
   loading: boolean;
   error: string | null;
-  punchIn: (subject: Subject) => Promise<void>;
-  pause: () => Promise<void>;
-  resume: () => Promise<void>;
-  punchOut: () => Promise<void>;
-  deleteSession: (id: string) => Promise<void>;
-  updateSession: (session: StudySession) => Promise<void>;
+  syncStatus: SyncStatus;
+  punchIn: (subject: Subject) => Promise<boolean>;
+  pause: () => Promise<boolean>;
+  resume: () => Promise<boolean>;
+  punchOut: () => Promise<boolean>;
+  deleteSession: (id: string) => Promise<boolean>;
+  updateSession: (session: StudySession) => Promise<boolean>;
   clearAllSessions: () => void;
   targetReachedToday: boolean;
   refreshSessions: () => Promise<void>;
@@ -40,170 +44,372 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeSession, setActiveSession] = useState<ActiveSessionState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('syncing');
   const [, setTick] = useState(0);
 
-  // Tick every second for live timer
+  // Tick every second to drive live timers & midnight updates
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // ─── Load sessions ────────────────────────────────────────────────────────
+  // ─── Fetch Ground Truth from Cloud ───────────────────────────────────────────
   const refreshSessions = useCallback(async () => {
     if (!user) {
-      // Not logged in — use localStorage only
+      // Offline / guest mode (uses localStorage)
       setSessions(loadLocalSessions());
       setActiveSession(loadLocalActive());
       setLoading(false);
+      setSyncStatus('offline');
       return;
     }
 
-    setLoading(true);
+    setSyncStatus('syncing');
     setError(null);
     try {
-      const dbSessions = await fetchSessions();
-      setSessions(dbSessions);
-
-      // Restore active session from DB (find any session with status active/paused)
-      const liveSession = dbSessions.find(s => s.status === 'active' || s.status === 'paused');
-      if (liveSession) {
-        setActiveSession({
-          sessionId: liveSession.id,
-          subject: liveSession.subject,
-          startTime: liveSession.startTime,
-          pauses: liveSession.pauses,
-          status: liveSession.status as 'active' | 'paused',
-        });
+      const { sessions: dbSessions, error: fetchErr } = await fetchSessions();
+      if (fetchErr) {
+        setError(`Failed to load sessions: ${fetchErr}`);
+        setSyncStatus('error');
+        // Fallback to local cache if cloud load failed
+        const local = loadLocalSessions();
+        if (local.length > 0) setSessions(local);
       } else {
-        setActiveSession(null);
+        setSessions(dbSessions);
+        saveLocalSessions(dbSessions); // keep cache fresh
+
+        // Check if there is an active/paused session in the database
+        const live = dbSessions.find(s => s.status === 'active' || s.status === 'paused');
+        if (live) {
+          const liveState: ActiveSessionState = {
+            sessionId: live.id,
+            subject: live.subject,
+            startTime: live.startTime,
+            pauses: live.pauses,
+            status: live.status as 'active' | 'paused',
+          };
+          setActiveSession(liveState);
+          saveLocalActive(liveState);
+        } else {
+          setActiveSession(null);
+          clearLocalActive();
+        }
+        setSyncStatus('synced');
       }
-    } catch (e: unknown) {
-      setError('Failed to load sessions. Check your connection.');
+    } catch (e: any) {
+      setError(e?.message || 'Connection error');
+      setSyncStatus('error');
     } finally {
       setLoading(false);
     }
   }, [user]);
 
-  // Reload when auth state changes
+  // Initial load when user changes
   useEffect(() => {
     refreshSessions();
   }, [refreshSessions]);
 
-  // If not logged in, persist to localStorage
+  // ─── Supabase Realtime Subscription (Cross-Device Live Sync) ─────────────────
   useEffect(() => {
-    if (!user) {
-      saveLocalSessions(sessions);
-    }
-  }, [sessions, user]);
+    if (!user) return;
 
-  useEffect(() => {
-    if (!user) {
-      if (activeSession) saveLocalActive(activeSession);
-      else clearLocalActive();
-    }
-  }, [activeSession, user]);
+    // Listen to all changes on study_sessions table for this user
+    const channelName = `study_sessions_${user.id}_${Date.now()}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'study_sessions',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          setSyncStatus('syncing');
 
-  // ─── Live productive ms ───────────────────────────────────────────────────
-  const todayProductiveMs = (() => {
-    const today = todayStr();
-    const completedMs = sessions
-      .filter(s => s.date === today && s.status === 'completed')
-      .reduce((acc, s) => acc + s.productiveDurationMs, 0);
-    const liveMs = activeSession
-      ? calcProductiveMsLive(activeSession.startTime, activeSession.pauses, activeSession.status)
-      : 0;
-    return completedMs + liveMs;
-  })();
+          if (payload.eventType === 'INSERT') {
+            const newRow = payload.new as DbSession;
+            if (!newRow || !newRow.id) return;
+            const newSession = dbToSession(newRow);
 
-  const targetReachedToday = msToHours(todayProductiveMs) >= DAILY_TARGET_HOURS;
+            setSessions(prev => {
+              if (prev.some(s => s.id === newSession.id)) {
+                return prev.map(s => s.id === newSession.id ? newSession : s);
+              }
+              return [newSession, ...prev];
+            });
 
-  // ─── Helper: save session (DB or local) ──────────────────────────────────
-  const saveSession = useCallback(async (session: StudySession) => {
-    if (user) {
-      await upsertSessionDb(session, user.id);
-    }
-    // Always keep local state in sync
-    setSessions(prev => {
-      const idx = prev.findIndex(s => s.id === session.id);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = session;
-        return copy;
-      }
-      return [...prev, session];
-    });
+            if (newSession.status === 'active' || newSession.status === 'paused') {
+              const liveState: ActiveSessionState = {
+                sessionId: newSession.id,
+                subject: newSession.subject,
+                startTime: newSession.startTime,
+                pauses: newSession.pauses,
+                status: newSession.status as 'active' | 'paused',
+              };
+              setActiveSession(liveState);
+              saveLocalActive(liveState);
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedRow = payload.new as DbSession;
+            if (!updatedRow || !updatedRow.id) return;
+            const updated = dbToSession(updatedRow);
+
+            setSessions(prev => prev.map(s => s.id === updated.id ? updated : s));
+
+            if (updated.status === 'completed') {
+              setActiveSession(curr => {
+                if (curr?.sessionId === updated.id) {
+                  clearLocalActive();
+                  return null;
+                }
+                return curr;
+              });
+            } else if (updated.status === 'active' || updated.status === 'paused') {
+              const liveState: ActiveSessionState = {
+                sessionId: updated.id,
+                subject: updated.subject,
+                startTime: updated.startTime,
+                pauses: updated.pauses,
+                status: updated.status as 'active' | 'paused',
+              };
+              setActiveSession(liveState);
+              saveLocalActive(liveState);
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as { id?: string };
+            const deletedId = oldRow?.id;
+            if (deletedId) {
+              setSessions(prev => prev.filter(s => s.id !== deletedId));
+              setActiveSession(curr => {
+                if (curr?.sessionId === deletedId) {
+                  clearLocalActive();
+                  return null;
+                }
+                return curr;
+              });
+            }
+          }
+
+          setSyncStatus('synced');
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          setSyncStatus('synced');
+        } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+          console.warn('Realtime channel error:', err);
+          setSyncStatus('error');
+        } else if (status === 'CLOSED') {
+          setSyncStatus('offline');
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
+  // ─── Network Online/Offline & Focus Reconnect ───────────────────────────────
+  useEffect(() => {
+    const handleOnline = () => {
+      setSyncStatus('syncing');
+      refreshSessions();
+    };
+    const handleOffline = () => {
+      setSyncStatus('offline');
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && user) {
+        // Re-verify latest session state when waking up or switching back to tab
+        refreshSessions();
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [user, refreshSessions]);
+
+  // ─── Live Productive Ms (Timestamp based, midnight-crossing safe) ───────────
+  const today = todayStr();
+  const todayProductiveMs = calcDayProductiveMs(sessions, activeSession, today);
+  const targetReachedToday = msToHours(todayProductiveMs) >= DAILY_TARGET_HOURS;
+
   // ─── Punch In ─────────────────────────────────────────────────────────────
-  const punchIn = useCallback(async (subject: Subject) => {
-    if (activeSession) return;
+  const punchIn = useCallback(async (subject: Subject): Promise<boolean> => {
+    // Prevent duplicate active session
+    if (activeSession) {
+      setError('A study session is already active. End or pause it before starting another.');
+      return false;
+    }
 
     const id = generateId();
     const now = new Date().toISOString();
-    const today = todayStr();
+    const sessionDate = dateStr(new Date(now));
 
     const newActive: ActiveSessionState = {
-      sessionId: id, subject, startTime: now, pauses: [], status: 'active',
+      sessionId: id,
+      subject,
+      startTime: now,
+      pauses: [],
+      status: 'active',
     };
 
     const skeletonSession: StudySession = {
-      id, date: today, subject, startTime: now, pauses: [],
-      status: 'active', productiveDurationMs: 0,
+      id,
+      date: sessionDate,
+      subject,
+      startTime: now,
+      pauses: [],
+      status: 'active',
+      productiveDurationMs: 0,
     };
 
+    // Optimistic local update
     setActiveSession(newActive);
-    await saveSession(skeletonSession);
-  }, [activeSession, saveSession]);
+    setSessions(prev => [skeletonSession, ...prev]);
+    saveLocalActive(newActive);
+
+    if (user) {
+      setSyncStatus('syncing');
+      const { success, error: err } = await upsertSessionDb(skeletonSession, user.id);
+      if (!success) {
+        setError(`Failed to save punch in to cloud: ${err}`);
+        setSyncStatus('error');
+        return false;
+      }
+      setSyncStatus('synced');
+    }
+
+    return true;
+  }, [activeSession, user]);
 
   // ─── Pause ────────────────────────────────────────────────────────────────
-  const pause = useCallback(async () => {
-    if (!activeSession || activeSession.status !== 'active') return;
+  const pause = useCallback(async (): Promise<boolean> => {
+    if (!activeSession || activeSession.status !== 'active') return false;
+
     const now = new Date().toISOString();
     const updatedPauses = [...activeSession.pauses, { pausedAt: now }];
-    const updated: ActiveSessionState = { ...activeSession, status: 'paused', pauses: updatedPauses };
-    setActiveSession(updated);
+    const updatedState: ActiveSessionState = {
+      ...activeSession,
+      status: 'paused',
+      pauses: updatedPauses,
+    };
 
-    const session = sessions.find(s => s.id === activeSession.sessionId);
-    if (session) {
-      await saveSession({ ...session, pauses: updatedPauses, status: 'paused' });
+    // Optimistic update
+    setActiveSession(updatedState);
+    saveLocalActive(updatedState);
+
+    const existing = sessions.find(s => s.id === activeSession.sessionId);
+    const updatedSession: StudySession = existing
+      ? { ...existing, pauses: updatedPauses, status: 'paused' }
+      : {
+          id: activeSession.sessionId,
+          date: dateStr(new Date(activeSession.startTime)),
+          subject: activeSession.subject,
+          startTime: activeSession.startTime,
+          pauses: updatedPauses,
+          status: 'paused',
+          productiveDurationMs: 0,
+        };
+
+    setSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
+
+    if (user) {
+      setSyncStatus('syncing');
+      const { success, error: err } = await upsertSessionDb(updatedSession, user.id);
+      if (!success) {
+        setError(`Failed to save pause to cloud: ${err}`);
+        setSyncStatus('error');
+        return false;
+      }
+      setSyncStatus('synced');
     }
-  }, [activeSession, sessions, saveSession]);
+
+    return true;
+  }, [activeSession, sessions, user]);
 
   // ─── Resume ───────────────────────────────────────────────────────────────
-  const resume = useCallback(async () => {
-    if (!activeSession || activeSession.status !== 'paused') return;
+  const resume = useCallback(async (): Promise<boolean> => {
+    if (!activeSession || activeSession.status !== 'paused') return false;
+
     const now = new Date().toISOString();
     const updatedPauses = activeSession.pauses.map((p, i) =>
-      i === activeSession.pauses.length - 1 && !p.resumedAt ? { ...p, resumedAt: now } : p
+      i === activeSession.pauses.length - 1 && !p.resumedAt
+        ? { ...p, resumedAt: now }
+        : p
     );
-    const updated: ActiveSessionState = { ...activeSession, status: 'active', pauses: updatedPauses };
-    setActiveSession(updated);
 
-    const session = sessions.find(s => s.id === activeSession.sessionId);
-    if (session) {
-      await saveSession({ ...session, pauses: updatedPauses, status: 'active' });
+    const updatedState: ActiveSessionState = {
+      ...activeSession,
+      status: 'active',
+      pauses: updatedPauses,
+    };
+
+    // Optimistic update
+    setActiveSession(updatedState);
+    saveLocalActive(updatedState);
+
+    const existing = sessions.find(s => s.id === activeSession.sessionId);
+    const updatedSession: StudySession = existing
+      ? { ...existing, pauses: updatedPauses, status: 'active' }
+      : {
+          id: activeSession.sessionId,
+          date: dateStr(new Date(activeSession.startTime)),
+          subject: activeSession.subject,
+          startTime: activeSession.startTime,
+          pauses: updatedPauses,
+          status: 'active',
+          productiveDurationMs: 0,
+        };
+
+    setSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
+
+    if (user) {
+      setSyncStatus('syncing');
+      const { success, error: err } = await upsertSessionDb(updatedSession, user.id);
+      if (!success) {
+        setError(`Failed to save resume to cloud: ${err}`);
+        setSyncStatus('error');
+        return false;
+      }
+      setSyncStatus('synced');
     }
-  }, [activeSession, sessions, saveSession]);
+
+    return true;
+  }, [activeSession, sessions, user]);
 
   // ─── Punch Out ────────────────────────────────────────────────────────────
-  const punchOut = useCallback(async () => {
-    if (!activeSession) return;
+  const punchOut = useCallback(async (): Promise<boolean> => {
+    if (!activeSession) return false;
+
     const now = new Date().toISOString();
 
+    // Close any unclosed pause
     let finalPauses = [...activeSession.pauses];
     if (activeSession.status === 'paused') {
       finalPauses = finalPauses.map((p, i) =>
-        i === finalPauses.length - 1 && !p.resumedAt ? { ...p, resumedAt: now } : p
+        i === finalPauses.length - 1 && !p.resumedAt
+          ? { ...p, resumedAt: now }
+          : p
       );
     }
 
     const totalMs = new Date(now).getTime() - new Date(activeSession.startTime).getTime();
-    const pausedMs = calcPausedMs(finalPauses);
+    const pausedMs = calcPausedMs(finalPauses, new Date(now).getTime());
     const productiveDurationMs = Math.max(0, totalMs - pausedMs);
 
     const completedSession: StudySession = {
       id: activeSession.sessionId,
-      date: activeSession.startTime.slice(0, 10),
+      date: dateStr(new Date(activeSession.startTime)),
       subject: activeSession.subject,
       startTime: activeSession.startTime,
       endTime: now,
@@ -212,39 +418,98 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       productiveDurationMs,
     };
 
+    // Optimistic update
     setActiveSession(null);
-    await saveSession(completedSession);
-  }, [activeSession, saveSession]);
+    clearLocalActive();
+    setSessions(prev => {
+      const exists = prev.some(s => s.id === completedSession.id);
+      if (exists) {
+        return prev.map(s => s.id === completedSession.id ? completedSession : s);
+      }
+      return [completedSession, ...prev];
+    });
 
-  // ─── Delete session ───────────────────────────────────────────────────────
-  const deleteSession = useCallback(async (id: string) => {
+    if (user) {
+      setSyncStatus('syncing');
+      const { success, error: err } = await upsertSessionDb(completedSession, user.id);
+      if (!success) {
+        setError(`Failed to save punch out to cloud: ${err}`);
+        setSyncStatus('error');
+        return false;
+      }
+      setSyncStatus('synced');
+    } else {
+      saveLocalSessions(sessions);
+    }
+
+    return true;
+  }, [activeSession, sessions, user]);
+
+  // ─── Delete Session ───────────────────────────────────────────────────────
+  const deleteSession = useCallback(async (id: string): Promise<boolean> => {
     setSessions(prev => prev.filter(s => s.id !== id));
-    if (activeSession?.sessionId === id) setActiveSession(null);
-    if (user) await deleteSessionDb(id);
+    if (activeSession?.sessionId === id) {
+      setActiveSession(null);
+      clearLocalActive();
+    }
+
+    if (user) {
+      setSyncStatus('syncing');
+      const { success, error: err } = await deleteSessionDb(id);
+      if (!success) {
+        setError(`Failed to delete session: ${err}`);
+        setSyncStatus('error');
+        return false;
+      }
+      setSyncStatus('synced');
+    }
+
+    return true;
   }, [activeSession, user]);
 
-  // ─── Update session ───────────────────────────────────────────────────────
-  const updateSession = useCallback(async (session: StudySession) => {
-    await saveSession(session);
-  }, [saveSession]);
+  // ─── Update Session (from Edit modal) ──────────────────────────────────────
+  const updateSession = useCallback(async (session: StudySession): Promise<boolean> => {
+    setSessions(prev => prev.map(s => s.id === session.id ? session : s));
 
-  // ─── Clear all ────────────────────────────────────────────────────────────
+    if (user) {
+      setSyncStatus('syncing');
+      const { success, error: err } = await upsertSessionDb(session, user.id);
+      if (!success) {
+        setError(`Failed to update session: ${err}`);
+        setSyncStatus('error');
+        return false;
+      }
+      setSyncStatus('synced');
+    }
+
+    return true;
+  }, [user]);
+
+  // ─── Clear All ────────────────────────────────────────────────────────────
   const clearAllSessions = useCallback(() => {
     setSessions([]);
     setActiveSession(null);
-    if (!user) {
-      localStorage.removeItem('study_tracker_sessions');
-      localStorage.removeItem('study_tracker_active_session');
-    }
-  }, [user]);
+    clearLocalActive();
+    localStorage.removeItem('study_tracker_sessions');
+  }, []);
 
   return (
     <AppContext.Provider value={{
-      sessions, activeSession, todayProductiveMs,
-      loading, error,
-      punchIn, pause, resume, punchOut,
-      deleteSession, updateSession, clearAllSessions,
-      targetReachedToday, refreshSessions,
+      sessions,
+      activeSession,
+      todayProductiveMs,
+      loading,
+      error,
+      syncStatus,
+      punchIn,
+      pause,
+      resume,
+      punchOut,
+      deleteSession,
+      updateSession,
+      clearAllSessions,
+      targetReachedToday,
+      refreshSessions,
     }}>
       {children}
     </AppContext.Provider>

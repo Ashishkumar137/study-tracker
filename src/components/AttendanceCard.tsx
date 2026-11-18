@@ -80,14 +80,6 @@ export default function AttendanceCard() {
 
   return (
     <>
-      {showConfirm && (
-        <ConfirmDialog
-          message="Are you sure you want to end this study session? The session will be saved to the cloud."
-          onConfirm={() => { punchOut(); setShowConfirm(false); }}
-          onCancel={() => setShowConfirm(false)}
-        />
-      )}
-
       <div className="bg-white rounded-2xl border p-6 shadow-sm" style={{ borderColor: '#E2E8F0' }}>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
@@ -220,7 +212,7 @@ export default function AttendanceCard() {
           {/* Punch Out */}
           {activeSession && (
             <button
-              onClick={() => setShowConfirm(true)}
+              onClick={punchOut}
               className="flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold border transition-all"
               style={{ background: '#FEF2F2', color: '#DC2626', borderColor: '#FECACA' }}
               onMouseEnter={e => (e.currentTarget.style.background = '#FEE2E2')}

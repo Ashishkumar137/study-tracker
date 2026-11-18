@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useApp } from '../AppContext';
 import { SUBJECTS } from '../types';
-import { msToHours, formatHours, getWeekStart, dateStr, todayStr } from '../storage';
+import { msToHours, formatHours, getWeekStart, dateStr, todayStr, calcSubjectRangeProductiveMs } from '../storage';
 import { subjectHexColor } from './SubjectSummaryTable';
 
 type FilterMode = 'week' | 'month' | 'custom';
@@ -11,21 +11,20 @@ function CustomTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
   const { name, value, percent } = payload[0];
   return (
-    <div className="bg-white border border-gray-200 shadow-lg rounded-xl px-3 py-2 text-sm">
-      <p className="font-semibold text-gray-700">{name}</p>
-      <p className="text-gray-600">{formatHours(value)}</p>
-      <p className="text-gray-400">{(percent * 100).toFixed(1)}%</p>
+    <div className="bg-white border shadow-lg rounded-xl px-3 py-2 text-sm" style={{ borderColor: '#E2E8F0' }}>
+      <p className="font-semibold" style={{ color: '#1E293B' }}>{name}</p>
+      <p style={{ color: '#2563EB' }}>{formatHours(value)}</p>
+      <p className="text-xs" style={{ color: '#64748B' }}>{(percent * 100).toFixed(1)}%</p>
     </div>
   );
 }
 
 export default function SubjectDonutChart() {
-  const { sessions } = useApp();
+  const { sessions, activeSession } = useApp();
   const [mode, setMode] = useState<FilterMode>('week');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
 
-  const today = todayStr();
   const now = new Date();
 
   function filterSession(date: string): boolean {
@@ -45,29 +44,31 @@ export default function SubjectDonutChart() {
     return true;
   }
 
-  const data = SUBJECTS.map(subject => ({
-    name: subject,
-    value: parseFloat(msToHours(
-      sessions
-        .filter(s => s.status === 'completed' && s.subject === subject && filterSession(s.date))
-        .reduce((acc, s) => acc + s.productiveDurationMs, 0)
-    ).toFixed(2)),
-    color: subjectHexColor(subject),
-  })).filter(d => d.value > 0);
+  const data = SUBJECTS.map(subject => {
+    const ms = calcSubjectRangeProductiveMs(sessions, activeSession, subject, filterSession);
+    const hours = parseFloat(msToHours(ms).toFixed(2));
+    return {
+      name: subject,
+      value: hours,
+      color: subjectHexColor(subject),
+    };
+  }).filter(d => d.value > 0);
 
   const total = data.reduce((a, d) => a + d.value, 0);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+    <div className="bg-white rounded-2xl border p-5 shadow-sm" style={{ borderColor: '#E2E8F0' }}>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h2 className="text-base font-semibold text-gray-900">Subject Distribution</h2>
+        <h2 className="text-base font-semibold" style={{ color: '#1E293B' }}>Subject Distribution</h2>
         <div className="flex items-center gap-1.5 flex-wrap">
           {(['week', 'month', 'custom'] as FilterMode[]).map(m => (
             <button
               key={m}
               onClick={() => setMode(m)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize
-                ${mode === m ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              className="px-3 py-1 rounded-full text-xs font-semibold border transition-all capitalize"
+              style={mode === m
+                ? { background: '#DBEAFE', color: '#1D4ED8', borderColor: '#BFDBFE' }
+                : { background: '#F8FAFC', color: '#64748B', borderColor: '#E2E8F0' }}
             >
               {m === 'week' ? 'This Week' : m === 'month' ? 'This Month' : 'Custom'}
             </button>
@@ -81,20 +82,22 @@ export default function SubjectDonutChart() {
             type="date"
             value={customFrom}
             onChange={e => setCustomFrom(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className="border rounded-lg px-3 py-1.5 text-xs outline-none"
+            style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
           />
           <input
             type="date"
             value={customTo}
             onChange={e => setCustomTo(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className="border rounded-lg px-3 py-1.5 text-xs outline-none"
+            style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
           />
         </div>
       )}
 
       {data.length === 0 ? (
-        <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
-          No study data for this period
+        <div className="h-48 flex items-center justify-center text-xs" style={{ color: '#94a3b8' }}>
+          No study data recorded for this period
         </div>
       ) : (
         <>
@@ -123,13 +126,17 @@ export default function SubjectDonutChart() {
               <div key={d.name} className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
                 <div className="min-w-0">
-                  <p className="text-xs text-gray-600 font-medium">{d.name}</p>
-                  <p className="text-xs text-gray-400 tabular-nums">{formatHours(d.value)} · {total > 0 ? ((d.value / total) * 100).toFixed(0) : 0}%</p>
+                  <p className="text-xs font-semibold" style={{ color: '#1E293B' }}>{d.name}</p>
+                  <p className="text-xs tabular-nums" style={{ color: '#64748B' }}>
+                    {formatHours(d.value)} · {total > 0 ? ((d.value / total) * 100).toFixed(0) : 0}%
+                  </p>
                 </div>
               </div>
             ))}
           </div>
-          <p className="text-center text-xs text-gray-400 mt-3">Total: {formatHours(total)}</p>
+          <p className="text-center text-xs mt-3 font-medium" style={{ color: '#64748B' }}>
+            Total: <span style={{ color: '#1E293B' }}>{formatHours(total)}</span>
+          </p>
         </>
       )}
     </div>
