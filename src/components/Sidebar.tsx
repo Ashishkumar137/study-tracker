@@ -99,7 +99,7 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
             <p className="text-xs font-semibold truncate" style={{ color: '#1E293B' }} title={user.email}>
               {user.email}
             </p>
-            <p className="text-[10px]" style={{ color: '#64748B' }}>SSC CGL Prep</p>
+            <p className="text-[10px]" style={{ color: '#64748B' }}>Personal Dashboard</p>
           </div>
           <button
             onClick={signOut}
@@ -121,7 +121,7 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
           </button>
         </div>
       ) : (
-        <p className="text-xs" style={{ color: '#94A3B8' }}>SSC CGL Prep</p>
+        <p className="text-xs" style={{ color: '#94A3B8' }}>Study Tracker</p>
       )}
     </div>
   );
@@ -133,7 +133,7 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
       </div>
       <div>
         <span className="font-bold text-base block leading-tight" style={{ color: '#1E293B' }}>Study Tracker</span>
-        <span className="text-[10px] font-semibold tracking-wider uppercase block" style={{ color: '#2563EB' }}>SSC CGL</span>
+        <span className="text-[10px] font-semibold tracking-wider uppercase block" style={{ color: '#2563EB' }}>Productivity</span>
       </div>
     </div>
   );

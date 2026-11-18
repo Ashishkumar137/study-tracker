@@ -54,7 +54,7 @@ export default function AuthPage() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#1E293B' }}>Study Tracker</h1>
           <p className="text-xs font-semibold uppercase tracking-wider mt-1" style={{ color: '#2563EB' }}>
-            SSC CGL Attendance & Productivity
+            Attendance & Productivity Dashboard
           </p>
         </div>
 
