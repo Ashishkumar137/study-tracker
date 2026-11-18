@@ -11,7 +11,7 @@ import { NavPage } from './types';
 import { Loader2 } from 'lucide-react';
 
 function AppShell() {
-  const { user, loading } = useAuth();
+  const { user, loading, isPasswordRecovery } = useAuth();
   const [page, setPage] = useState<NavPage>('dashboard');
 
   if (loading) {
@@ -30,8 +30,8 @@ function AppShell() {
     );
   }
 
-  if (!user) {
-    return <AuthPage />;
+  if (!user || isPasswordRecovery) {
+    return <AuthPage initialMode={isPasswordRecovery ? 'reset-password' : 'login'} />;
   }
 
   return (
