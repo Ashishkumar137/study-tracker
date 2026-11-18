@@ -11,7 +11,7 @@ import {
   calcPausedMs, calcDayProductiveMs,
   msToHours, generateId, todayStr, dateStr,
 } from './storage';
-import { fetchSessions, upsertSessionDb, deleteSessionDb, dbToSession, DbSession } from './db';
+import { fetchSessions, upsertSessionDb, deleteSessionDb, importSessionsToDb, dbToSession, DbSession } from './db';
 import { useAuth } from './AuthContext';
 import { supabase } from './supabaseClient';
 
@@ -30,6 +30,7 @@ interface AppContextValue {
   punchOut: () => Promise<boolean>;
   deleteSession: (id: string) => Promise<boolean>;
   updateSession: (session: StudySession) => Promise<boolean>;
+  addManualSession: (session: StudySession) => Promise<boolean>;
   clearAllSessions: () => void;
   targetReachedToday: boolean;
   refreshSessions: () => Promise<void>;
@@ -53,7 +54,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, []);
 
-  // ─── Fetch Ground Truth from Cloud ───────────────────────────────────────────
+  // ─── Fetch Ground Truth from Cloud (Safe Non-Destructive Merge) ──────────────
   const refreshSessions = useCallback(async () => {
     if (!user) {
       // Offline / guest mode (uses localStorage)
@@ -74,26 +75,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Fallback to local cache if cloud load failed
         const local = loadLocalSessions();
         if (local.length > 0) setSessions(local);
+        const localActive = loadLocalActive();
+        if (localActive) setActiveSession(localActive);
       } else {
-        setSessions(dbSessions);
-        saveLocalSessions(dbSessions); // keep cache fresh
+        // Safe Merge: Never wipe local sessions if DB returned fewer/empty
+        const local = loadLocalSessions();
+        const unsavedLocal = local.filter(l => !dbSessions.some(db => db.id === l.id));
 
-        // Check if there is an active/paused session in the database
-        const live = dbSessions.find(s => s.status === 'active' || s.status === 'paused');
-        if (live) {
+        let mergedSessions = dbSessions;
+        if (unsavedLocal.length > 0) {
+          mergedSessions = [...unsavedLocal, ...dbSessions];
+          // Auto-migrate unsaved local sessions to cloud so nothing is lost!
+          importSessionsToDb(unsavedLocal, user.id).catch(console.error);
+        }
+
+        setSessions(mergedSessions);
+        saveLocalSessions(mergedSessions); // keep cache fresh
+
+        // Check active session:
+        const liveFromDb = dbSessions.find(s => s.status === 'active' || s.status === 'paused');
+        const localActive = loadLocalActive();
+
+        if (liveFromDb) {
           const liveState: ActiveSessionState = {
-            sessionId: live.id,
-            subject: live.subject,
-            startTime: live.startTime,
-            pauses: live.pauses,
-            status: live.status as 'active' | 'paused',
+            sessionId: liveFromDb.id,
+            subject: liveFromDb.subject,
+            startTime: liveFromDb.startTime,
+            pauses: liveFromDb.pauses,
+            status: liveFromDb.status as 'active' | 'paused',
           };
           setActiveSession(liveState);
           saveLocalActive(liveState);
+        } else if (localActive) {
+          // If a session was active locally while permissions were resolving, keep it!
+          setActiveSession(localActive);
+          const activeSessionObj: StudySession = {
+            id: localActive.sessionId,
+            date: dateStr(new Date(localActive.startTime)),
+            subject: localActive.subject,
+            startTime: localActive.startTime,
+            pauses: localActive.pauses,
+            status: localActive.status,
+            productiveDurationMs: 0,
+          };
+          upsertSessionDb(activeSessionObj, user.id).catch(console.error);
         } else {
           setActiveSession(null);
-          clearLocalActive();
         }
+
         setSyncStatus('synced');
       }
     } catch (e: any) {
@@ -113,7 +142,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) return;
 
-    // Listen to all changes on study_sessions table for this user
     const channelName = `study_sessions_${user.id}_${Date.now()}`;
     const channel = supabase
       .channel(channelName)
@@ -137,7 +165,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               if (prev.some(s => s.id === newSession.id)) {
                 return prev.map(s => s.id === newSession.id ? newSession : s);
               }
-              return [newSession, ...prev];
+              const updated = [newSession, ...prev];
+              saveLocalSessions(updated);
+              return updated;
             });
 
             if (newSession.status === 'active' || newSession.status === 'paused') {
@@ -156,7 +186,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             if (!updatedRow || !updatedRow.id) return;
             const updated = dbToSession(updatedRow);
 
-            setSessions(prev => prev.map(s => s.id === updated.id ? updated : s));
+            setSessions(prev => {
+              const next = prev.map(s => s.id === updated.id ? updated : s);
+              saveLocalSessions(next);
+              return next;
+            });
 
             if (updated.status === 'completed') {
               setActiveSession(curr => {
@@ -181,7 +215,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             const oldRow = payload.old as { id?: string };
             const deletedId = oldRow?.id;
             if (deletedId) {
-              setSessions(prev => prev.filter(s => s.id !== deletedId));
+              setSessions(prev => {
+                const next = prev.filter(s => s.id !== deletedId);
+                saveLocalSessions(next);
+                return next;
+              });
               setActiveSession(curr => {
                 if (curr?.sessionId === deletedId) {
                   clearLocalActive();
@@ -222,7 +260,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && user) {
-        // Re-verify latest session state when waking up or switching back to tab
         refreshSessions();
       }
     };
@@ -245,7 +282,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Punch In ─────────────────────────────────────────────────────────────
   const punchIn = useCallback(async (subject: Subject): Promise<boolean> => {
-    // Prevent duplicate active session
     if (activeSession) {
       setError('A study session is already active. End or pause it before starting another.');
       return false;
@@ -273,7 +309,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       productiveDurationMs: 0,
     };
 
-    // Optimistic local update
     setActiveSession(newActive);
     setSessions(prev => [skeletonSession, ...prev]);
     saveLocalActive(newActive);
@@ -304,7 +339,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pauses: updatedPauses,
     };
 
-    // Optimistic update
     setActiveSession(updatedState);
     saveLocalActive(updatedState);
 
@@ -354,7 +388,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pauses: updatedPauses,
     };
 
-    // Optimistic update
     setActiveSession(updatedState);
     saveLocalActive(updatedState);
 
@@ -393,7 +426,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const now = new Date().toISOString();
 
-    // Close any unclosed pause
     let finalPauses = [...activeSession.pauses];
     if (activeSession.status === 'paused') {
       finalPauses = finalPauses.map((p, i) =>
@@ -418,15 +450,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       productiveDurationMs,
     };
 
-    // Optimistic update
     setActiveSession(null);
     clearLocalActive();
     setSessions(prev => {
       const exists = prev.some(s => s.id === completedSession.id);
-      if (exists) {
-        return prev.map(s => s.id === completedSession.id ? completedSession : s);
-      }
-      return [completedSession, ...prev];
+      const next = exists
+        ? prev.map(s => s.id === completedSession.id ? completedSession : s)
+        : [completedSession, ...prev];
+      saveLocalSessions(next);
+      return next;
     });
 
     if (user) {
@@ -438,16 +470,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       setSyncStatus('synced');
-    } else {
-      saveLocalSessions(sessions);
     }
 
     return true;
   }, [activeSession, sessions, user]);
 
+  // ─── Add Manual Session (Correction option) ───────────────────────────────
+  const addManualSession = useCallback(async (session: StudySession): Promise<boolean> => {
+    setSessions(prev => {
+      const next = [session, ...prev];
+      saveLocalSessions(next);
+      return next;
+    });
+
+    if (user) {
+      setSyncStatus('syncing');
+      const { success, error: err } = await upsertSessionDb(session, user.id);
+      if (!success) {
+        setError(`Failed to save session to cloud: ${err}`);
+        setSyncStatus('error');
+        return false;
+      }
+      setSyncStatus('synced');
+    }
+
+    return true;
+  }, [user]);
+
   // ─── Delete Session ───────────────────────────────────────────────────────
   const deleteSession = useCallback(async (id: string): Promise<boolean> => {
-    setSessions(prev => prev.filter(s => s.id !== id));
+    setSessions(prev => {
+      const next = prev.filter(s => s.id !== id);
+      saveLocalSessions(next);
+      return next;
+    });
+
     if (activeSession?.sessionId === id) {
       setActiveSession(null);
       clearLocalActive();
@@ -467,9 +524,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, [activeSession, user]);
 
-  // ─── Update Session (from Edit modal) ──────────────────────────────────────
+  // ─── Update Session ───────────────────────────────────────────────────────
   const updateSession = useCallback(async (session: StudySession): Promise<boolean> => {
-    setSessions(prev => prev.map(s => s.id === session.id ? session : s));
+    setSessions(prev => {
+      const next = prev.map(s => s.id === session.id ? session : s);
+      saveLocalSessions(next);
+      return next;
+    });
 
     if (user) {
       setSyncStatus('syncing');
@@ -507,6 +568,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       punchOut,
       deleteSession,
       updateSession,
+      addManualSession,
       clearAllSessions,
       targetReachedToday,
       refreshSessions,

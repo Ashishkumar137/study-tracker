@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import {
   Trash2, Pencil, CheckCircle2, XCircle,
-  AlertTriangle, ChevronDown, X
+  AlertTriangle, ChevronDown, X, Plus
 } from 'lucide-react';
 import { useApp } from '../AppContext';
 import { StudySession, Subject, SUBJECTS } from '../types';
-import { formatDuration, calcPausedMs, dateStr } from '../storage';
+import { formatDuration, calcPausedMs, dateStr, generateId } from '../storage';
 import { subjectColor } from './SubjectSummaryTable';
 
 function ConfirmDialog({
@@ -32,6 +32,130 @@ function ConfirmDialog({
             style={{ background: '#FEF2F2', borderColor: '#FECACA', color: '#DC2626' }}
           >
             Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddSessionModal({ onSave, onClose }: {
+  onSave: (s: StudySession) => void;
+  onClose: () => void;
+}) {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const defaultDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+  // Default to 30 mins ago to now
+  const thirtyMinsAgo = new Date(now.getTime() - 30 * 60 * 1000);
+  const defaultStart = `${defaultDate}T${pad(thirtyMinsAgo.getHours())}:${pad(thirtyMinsAgo.getMinutes())}`;
+  const defaultEnd = `${defaultDate}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  const [startTime, setStartTime] = useState(defaultStart);
+  const [endTime, setEndTime] = useState(defaultEnd);
+  const [subject, setSubject] = useState<Subject>('Maths');
+  const [error, setError] = useState('');
+
+  const handleSave = () => {
+    if (!startTime || !endTime) {
+      setError('Start time and end time are both required.');
+      return;
+    }
+    const st = new Date(startTime);
+    const et = new Date(endTime);
+    if (isNaN(st.getTime()) || isNaN(et.getTime())) {
+      setError('Invalid date/time format.');
+      return;
+    }
+    if (et <= st) {
+      setError('End time must be after start time.');
+      return;
+    }
+
+    const totalMs = et.getTime() - st.getTime();
+    const productiveDurationMs = Math.max(0, totalMs);
+
+    onSave({
+      id: generateId(),
+      subject,
+      startTime: st.toISOString(),
+      endTime: et.toISOString(),
+      date: dateStr(st),
+      pauses: [],
+      productiveDurationMs,
+      status: 'completed',
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md mx-4 w-full border" style={{ borderColor: '#E2E8F0' }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-semibold" style={{ color: '#1E293B' }}>Add Past Study Session</h3>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+            style={{ color: '#94A3B8' }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: '#64748B' }}>Subject</label>
+            <select
+              value={subject}
+              onChange={e => setSubject(e.target.value as Subject)}
+              className="w-full border rounded-xl px-3 py-2 text-sm outline-none"
+              style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
+            >
+              {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: '#64748B' }}>Punch In Time</label>
+            <input
+              type="datetime-local"
+              value={startTime}
+              onChange={e => setStartTime(e.target.value)}
+              className="w-full border rounded-xl px-3 py-2 text-sm outline-none"
+              style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: '#64748B' }}>Punch Out Time</label>
+            <input
+              type="datetime-local"
+              value={endTime}
+              onChange={e => setEndTime(e.target.value)}
+              className="w-full border rounded-xl px-3 py-2 text-sm outline-none"
+              style={{ borderColor: '#E2E8F0', color: '#1E293B', background: '#FFFFFF' }}
+            />
+          </div>
+          {error && (
+            <p className="text-xs rounded-lg p-2" style={{ background: '#FEF2F2', color: '#DC2626' }}>
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div className="flex gap-3 justify-end mt-5">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
+            style={{ background: '#F8FAFC', borderColor: '#E2E8F0', color: '#64748B' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 rounded-xl text-sm font-semibold border transition-colors"
+            style={{ background: '#DBEAFE', borderColor: '#BFDBFE', color: '#1D4ED8' }}
+          >
+            Save Session to Cloud
           </button>
         </div>
       </div>
@@ -80,7 +204,7 @@ function EditModal({ session, onSave, onClose }: {
       subject,
       startTime: st.toISOString(),
       endTime: et.toISOString(),
-      date: dateStr(st), // local date
+      date: dateStr(st),
       productiveDurationMs,
       status: 'completed',
     });
@@ -95,7 +219,7 @@ function EditModal({ session, onSave, onClose }: {
           <button
             onClick={onClose}
             className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
-            style={{ color: '#94a3b8' }}
+            style={{ color: '#94A3B8' }}
           >
             <X size={18} />
           </button>
@@ -162,11 +286,12 @@ function EditModal({ session, onSave, onClose }: {
 }
 
 export default function HistoryTable() {
-  const { sessions, deleteSession, updateSession } = useApp();
+  const { sessions, deleteSession, updateSession, addManualSession } = useApp();
   const [filterSubject, setFilterSubject] = useState<Subject | 'All'>('All');
   const [filterDate, setFilterDate] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<StudySession | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const completed = sessions
     .filter(s => s.status === 'completed')
@@ -188,6 +313,12 @@ export default function HistoryTable() {
 
   return (
     <>
+      {showAddModal && (
+        <AddSessionModal
+          onSave={s => addManualSession(s)}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
       {deleteTarget && (
         <ConfirmDialog
           message="Delete this session from your cloud records? This action cannot be undone."
@@ -204,9 +335,21 @@ export default function HistoryTable() {
       )}
 
       <div className="bg-white rounded-2xl border shadow-sm overflow-hidden" style={{ borderColor: '#E2E8F0' }}>
-        {/* Header + Filters */}
+        {/* Header + Filters + Add Button */}
         <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center gap-3" style={{ borderColor: '#E2E8F0' }}>
-          <h2 className="text-base font-semibold flex-1" style={{ color: '#1E293B' }}>Attendance History</h2>
+          <div className="flex-1 flex items-center gap-3">
+            <h2 className="text-base font-semibold" style={{ color: '#1E293B' }}>Attendance History</h2>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all"
+              style={{ background: '#EFF6FF', borderColor: '#BFDBFE', color: '#2563EB' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#DBEAFE')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#EFF6FF')}
+            >
+              <Plus size={14} />
+              <span>Add Past Session</span>
+            </button>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative">
               <select
@@ -244,7 +387,15 @@ export default function HistoryTable() {
         <div className="overflow-x-auto">
           {completed.length === 0 ? (
             <div className="py-12 text-center text-sm" style={{ color: '#94a3b8' }}>
-              No completed sessions found for this filter.
+              <p>No completed sessions found for this filter.</p>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 mt-3 rounded-xl text-xs font-semibold border transition-all"
+                style={{ background: '#EFF6FF', borderColor: '#BFDBFE', color: '#2563EB' }}
+              >
+                <Plus size={13} />
+                <span>Add your first study session</span>
+              </button>
             </div>
           ) : (
             <table className="w-full text-sm">
