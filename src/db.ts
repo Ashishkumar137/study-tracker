@@ -68,6 +68,37 @@ export async function fetchSessions(): Promise<{ sessions: StudySession[]; error
   return { sessions: [], error: 'Failed after retries' };
 }
 
+// ─── Close all active/paused sessions for user (prevent ghost sessions) ────────
+export async function closeAllActiveSessionsDb(
+  userId: string,
+  exceptSessionId?: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    let query = supabase
+      .from('study_sessions')
+      .update({
+        status: 'completed',
+        end_time: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+      .in('status', ['active', 'paused']);
+
+    if (exceptSessionId) {
+      query = query.neq('id', exceptSessionId);
+    }
+
+    const { error } = await query;
+    if (error) {
+      console.error('closeAllActiveSessionsDb error:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true, error: null };
+  } catch (e: any) {
+    console.error('closeAllActiveSessionsDb exception:', e);
+    return { success: false, error: e?.message || 'Network error' };
+  }
+}
+
 // ─── Upsert a single session ──────────────────────────────────────────────────
 export async function upsertSessionDb(session: StudySession, userId: string): Promise<{ success: boolean; error: string | null }> {
   try {

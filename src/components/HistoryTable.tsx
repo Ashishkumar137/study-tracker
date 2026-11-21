@@ -455,7 +455,18 @@ export default function HistoryTable() {
                         </div>
                       </td>
                       <td className="px-4 py-3 tabular-nums" style={{ color: 'var(--text-secondary)' }}>{fmt(s.startTime)}</td>
-                      <td className="px-4 py-3 tabular-nums" style={{ color: 'var(--text-secondary)' }}>{s.endTime ? fmt(s.endTime) : '—'}</td>
+                      <td className="px-4 py-3 tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                        {s.endTime ? (
+                          <div className="flex flex-col">
+                            <span>{fmt(s.endTime)}</span>
+                            {dateStr(new Date(s.startTime)) !== dateStr(new Date(s.endTime)) && (
+                              <span className="text-[10px] text-amber-500 font-medium leading-tight">
+                                {fmtDate(dateStr(new Date(s.endTime)))}
+                              </span>
+                            )}
+                          </div>
+                        ) : '—'}
+                      </td>
                       <td className="px-4 py-3 tabular-nums text-right" style={{ color: 'var(--text-muted)' }}>
                         {breakMs > 0 ? formatDuration(breakMs) : '—'}
                       </td>

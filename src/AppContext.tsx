@@ -10,8 +10,12 @@ import {
   clearActiveSession as clearLocalActive,
   calcPausedMs, calcDayProductiveMs,
   msToHours, generateId, todayStr, dateStr,
+  MAX_SESSION_DURATION_MS,
 } from './storage';
-import { fetchSessions, upsertSessionDb, deleteSessionDb, importSessionsToDb, dbToSession, DbSession } from './db';
+import {
+  fetchSessions, upsertSessionDb, deleteSessionDb, importSessionsToDb,
+  dbToSession, DbSession, closeAllActiveSessionsDb
+} from './db';
 import { useAuth } from './AuthContext';
 import { supabase } from './supabaseClient';
 
@@ -89,38 +93,77 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           importSessionsToDb(unsavedLocal, user.id).catch(console.error);
         }
 
+        // ── Auto-repair & sanitize any runaway/corrupted sessions from the past ──
+        let didSanitize = false;
+        const sanitizedSessions = mergedSessions.map(s => {
+          if (s.status === 'completed' && s.startTime && s.endTime) {
+            const spanMs = new Date(s.endTime).getTime() - new Date(s.startTime).getTime();
+            // Detect runaway sessions (>12 hours productive or multi-day span)
+            if (s.productiveDurationMs > MAX_SESSION_DURATION_MS || spanMs > 24 * 3600 * 1000) {
+              didSanitize = true;
+              // Cleanly cap to a realistic 2.5 hour study session on its start date
+              const realisticMs = 2.5 * 3600 * 1000;
+              const cappedEnd = new Date(new Date(s.startTime).getTime() + realisticMs).toISOString();
+              const fixed: StudySession = {
+                ...s,
+                endTime: cappedEnd,
+                productiveDurationMs: realisticMs,
+                pauses: [],
+              };
+              if (user) upsertSessionDb(fixed, user.id).catch(console.error);
+              return fixed;
+            }
+          }
+          return s;
+        });
+
+        if (didSanitize) {
+          mergedSessions = sanitizedSessions;
+        }
+
         setSessions(mergedSessions);
         saveLocalSessions(mergedSessions); // keep cache fresh
 
-        // Check active session:
-        const liveFromDb = dbSessions.find(s => s.status === 'active' || s.status === 'paused');
-        const localActive = loadLocalActive();
+        // ── Single Active Session Enforcement & Ghost Timer Protection ───────────
+        const allLiveSessions = mergedSessions
+          .filter(s => s.status === 'active' || s.status === 'paused')
+          .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
-        if (liveFromDb) {
-          const liveState: ActiveSessionState = {
-            sessionId: liveFromDb.id,
-            subject: liveFromDb.subject,
-            startTime: liveFromDb.startTime,
-            pauses: liveFromDb.pauses,
-            status: liveFromDb.status as 'active' | 'paused',
-          };
-          setActiveSession(liveState);
-          saveLocalActive(liveState);
-        } else if (localActive) {
-          // If a session was active locally while permissions were resolving, keep it!
-          setActiveSession(localActive);
-          const activeSessionObj: StudySession = {
-            id: localActive.sessionId,
-            date: dateStr(new Date(localActive.startTime)),
-            subject: localActive.subject,
-            startTime: localActive.startTime,
-            pauses: localActive.pauses,
-            status: localActive.status,
-            productiveDurationMs: 0,
-          };
-          upsertSessionDb(activeSessionObj, user.id).catch(console.error);
+        if (allLiveSessions.length > 0) {
+          const newestLive = allLiveSessions[0];
+          const ageMs = Date.now() - new Date(newestLive.startTime).getTime();
+
+          // Close any secondary ghost active sessions in DB
+          if (allLiveSessions.length > 1 && user) {
+            closeAllActiveSessionsDb(user.id, newestLive.id).catch(console.error);
+          }
+
+          // If session was left open for over 16 hours (e.g. overnight or forgotten), auto-complete it!
+          if (ageMs > 16 * 3600 * 1000) {
+            const cappedDuration = 2 * 3600 * 1000; // 2h default
+            const autoEnded: StudySession = {
+              ...newestLive,
+              status: 'completed',
+              endTime: new Date(new Date(newestLive.startTime).getTime() + cappedDuration).toISOString(),
+              productiveDurationMs: cappedDuration,
+            };
+            if (user) upsertSessionDb(autoEnded, user.id).catch(console.error);
+            setActiveSession(null);
+            clearLocalActive();
+          } else {
+            const liveState: ActiveSessionState = {
+              sessionId: newestLive.id,
+              subject: newestLive.subject,
+              startTime: newestLive.startTime,
+              pauses: newestLive.pauses,
+              status: newestLive.status as 'active' | 'paused',
+            };
+            setActiveSession(liveState);
+            saveLocalActive(liveState);
+          }
         } else {
           setActiveSession(null);
+          clearLocalActive();
         }
 
         setSyncStatus('synced');
@@ -315,6 +358,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     if (user) {
       setSyncStatus('syncing');
+      // Ensure any previous unclosed/ghost sessions in DB are completed first
+      await closeAllActiveSessionsDb(user.id);
       const { success, error: err } = await upsertSessionDb(skeletonSession, user.id);
       if (!success) {
         setError(`Failed to save punch in to cloud: ${err}`);
@@ -437,7 +482,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const totalMs = new Date(now).getTime() - new Date(activeSession.startTime).getTime();
     const pausedMs = calcPausedMs(finalPauses, new Date(now).getTime());
-    const productiveDurationMs = Math.max(0, totalMs - pausedMs);
+    // Cap at MAX_SESSION_DURATION_MS to prevent runaway multi-day recordings
+    const productiveDurationMs = Math.min(MAX_SESSION_DURATION_MS, Math.max(0, totalMs - pausedMs));
 
     const completedSession: StudySession = {
       id: activeSession.sessionId,
@@ -464,6 +510,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (user) {
       setSyncStatus('syncing');
       const { success, error: err } = await upsertSessionDb(completedSession, user.id);
+      // Guarantee any other active sessions in DB are closed as well
+      closeAllActiveSessionsDb(user.id, completedSession.id).catch(console.error);
       if (!success) {
         setError(`Failed to save punch out to cloud: ${err}`);
         setSyncStatus('error');

@@ -75,9 +75,10 @@ export default function SummaryCards() {
   const todayHours = msToHours(todayProductiveMs);
   const targetAchieved = todayHours >= DAILY_TARGET_HOURS;
 
-  // Count sessions today
-  const todaySessionsCount = sessions.filter(s => s.status === 'completed' && s.date === today).length
-    + (activeSession ? 1 : 0);
+  // Count sessions today (sessions started today or active today)
+  const todaySessionsCount = sessions.filter(s =>
+    s.status === 'completed' && (s.date === today || calcDayProductiveMs([s], null, today) > 0)
+  ).length + (activeSession ? 1 : 0);
 
   // Weekly average (Mon - Sun of current week)
   const weekStart = getWeekStart(now);

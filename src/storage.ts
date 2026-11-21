@@ -39,7 +39,13 @@ export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-// ─── Time calculation rules (Precise, timestamp-based) ────────────────────────
+// ─── Time calculation rules (Precise, timestamp-based, overlap-safe) ─────────
+
+/**
+ * Maximum continuous study time permitted for a single session (12 hours).
+ * Prevents runaway timers if a user closes laptop or sleeps without punching out.
+ */
+export const MAX_SESSION_DURATION_MS = 12 * 3600 * 1000;
 
 export function calcPausedMs(pauses: PauseRecord[], nowMs: number = Date.now()): number {
   return pauses.reduce((acc, p) => {
@@ -60,7 +66,9 @@ export function calcProductiveMsLive(
   if (isNaN(start) || start > nowMs) return 0;
   const totalMs = nowMs - start;
   const pausedMs = calcPausedMs(pauses, nowMs);
-  return Math.max(0, totalMs - pausedMs);
+  const netMs = Math.max(0, totalMs - pausedMs);
+  // Cap at MAX_SESSION_DURATION_MS to prevent runaway timers
+  return Math.min(MAX_SESSION_DURATION_MS, netMs);
 }
 
 export function calcProductiveMsCompleted(session: StudySession): number {
@@ -70,7 +78,29 @@ export function calcProductiveMsCompleted(session: StudySession): number {
   if (isNaN(start) || isNaN(end) || end < start) return 0;
   const totalMs = end - start;
   const pausedMs = calcPausedMs(session.pauses, end);
-  return Math.max(0, totalMs - pausedMs);
+  const netMs = Math.max(0, totalMs - pausedMs);
+  return Math.min(MAX_SESSION_DURATION_MS, netMs);
+}
+
+/**
+ * Merge overlapping time intervals so that concurrent/overlapping sessions
+ * never double-count time.
+ */
+export function mergeIntervals(intervals: Array<{ start: number; end: number }>): Array<{ start: number; end: number }> {
+  if (intervals.length <= 1) return intervals;
+  const sorted = [...intervals].sort((a, b) => a.start - b.start);
+  const merged: Array<{ start: number; end: number }> = [sorted[0]];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = merged[merged.length - 1];
+    const curr = sorted[i];
+    if (curr.start <= prev.end) {
+      prev.end = Math.max(prev.end, curr.end);
+    } else {
+      merged.push({ ...curr });
+    }
+  }
+  return merged;
 }
 
 /**
@@ -118,7 +148,8 @@ function getProductiveSegments(
 
 /**
  * Calculates productive milliseconds for a specific calendar day (YYYY-MM-DD in local time).
- * Correctly clips sessions that cross midnight so time is allocated to the exact day it was studied!
+ * Correctly clips sessions that cross midnight, eliminates overlapping session double-counting,
+ * and guarantees a strict 24-hour daily ceiling.
  */
 export function calcDayProductiveMs(
   sessions: StudySession[],
@@ -133,7 +164,7 @@ export function calcDayProductiveMs(
   const dayStart = new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
   const dayEnd = new Date(y, m - 1, d, 23, 59, 59, 999).getTime() + 1; // exclusive upper bound
 
-  let totalMs = 0;
+  const rawIntervals: Array<{ start: number; end: number }> = [];
 
   // 1. Completed sessions
   for (const s of sessions) {
@@ -145,8 +176,11 @@ export function calcDayProductiveMs(
 
     const segments = getProductiveSegments(s.startTime, s.endTime, s.pauses, nowMs);
     for (const seg of segments) {
-      const overlap = Math.max(0, Math.min(seg.end, dayEnd) - Math.max(seg.start, dayStart));
-      totalMs += overlap;
+      const overlapStart = Math.max(seg.start, dayStart);
+      const overlapEnd = Math.min(seg.end, dayEnd);
+      if (overlapEnd > overlapStart) {
+        rawIntervals.push({ start: overlapStart, end: overlapEnd });
+      }
     }
   }
 
@@ -156,13 +190,21 @@ export function calcDayProductiveMs(
     if (sStart < dayEnd && nowMs > dayStart) {
       const segments = getProductiveSegments(activeSession.startTime, undefined, activeSession.pauses, nowMs);
       for (const seg of segments) {
-        const overlap = Math.max(0, Math.min(seg.end, dayEnd) - Math.max(seg.start, dayStart));
-        totalMs += overlap;
+        const overlapStart = Math.max(seg.start, dayStart);
+        const overlapEnd = Math.min(seg.end, dayEnd);
+        if (overlapEnd > overlapStart) {
+          rawIntervals.push({ start: overlapStart, end: overlapEnd });
+        }
       }
     }
   }
 
-  return totalMs;
+  // Merge intervals to completely eliminate duplicate or overlapping study time
+  const merged = mergeIntervals(rawIntervals);
+  const totalMs = merged.reduce((acc, seg) => acc + (seg.end - seg.start), 0);
+
+  // Maximum 24 hours per calendar day (hard mathematical limit)
+  return Math.min(24 * 3600 * 1000, Math.max(0, totalMs));
 }
 
 /**
@@ -195,7 +237,9 @@ export function calcSubjectRangeProductiveMs(
   for (const s of sessions) {
     if (s.subject !== subject || s.status !== 'completed') continue;
     if (dateFilter && !dateFilter(s.date)) continue;
-    totalMs += s.productiveDurationMs;
+    // Cap corrupted past records to MAX_SESSION_DURATION_MS
+    const validMs = Math.min(MAX_SESSION_DURATION_MS, Number(s.productiveDurationMs) || 0);
+    totalMs += validMs;
   }
 
   if (activeSession && activeSession.subject === subject) {
